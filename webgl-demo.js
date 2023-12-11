@@ -30,6 +30,8 @@ const v3 = twgl.v3;
 var sharedUniforms = {
 };
 
+var cubeBufferInfo = twgl.createBufferInfoFromArrays(gl, cubeArrays);
+
 // Create a buffer to put positions in
 var positionBuffer = gl.createBuffer();
 // Bind it to ARRAY_BUFFER (think of it as ARRAY_BUFFER = positionBuffer)
@@ -85,10 +87,49 @@ function main() {
     alert("need drawArraysInstanced and createVertexArray"); // eslint-disable-line
     return;
   }
+  const halfHeight = gl.canvas.height / 2;
+  const width = gl.canvas.width;
 
-  const cam = new StereoCamera(2000.0, 70.0, 1.33, 45.0, 10.0, 20000.0)
-  cam.ApplyLeftFrustum()
-  drawScene()
+  // clear the screen.
+  gl.disable(gl.SCISSOR_TEST);
+  gl.colorMask(true, true, true, true);
+  gl.clearColor(0, 0, 0, 0);
+  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+  gl.viewport(0, halfHeight, width, halfHeight);
+
+  gl.enable(gl.DEPTH_TEST);
+  gl.enable(gl.BLEND);
+  gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+
+  var aspect = gl.canvas.clientWidth / (gl.canvas.clientHeight / 2);
+
+  m4.perspective(
+      degToRad(60),
+      aspect,
+      1,
+      5000,
+      projection);
+
+  var f = Math.max(30, fieldOfView) - 30;
+  f = f / (179 - 30);
+  f = f * f * f * f;
+  f = lerp(1, 179 * 0.9, f);
+  f = 1;
+  v3.mulScalar(targetToEye, f, v3t0);
+  v3.add(v3t0, target, v3t0);
+  m4.lookAt(
+      v3t0, //eyePosition,
+      target,
+      up,
+      view);
+  m4.inverse(view, view);
+  m4.multiply(projection, view, viewProjection);
+//  const cam = new StereoCamera(2000.0, 70.0, 1.33, 45.0, 10.0, 20000.0)
+//  cam.ApplyLeftFrustum()
+  function drawScene(viewProjection, exampleProjection) {
+    
+  }
 }
 
 // Constructor function
@@ -407,48 +448,6 @@ function setColors(gl) {
         160, 160, 220,
         160, 160, 220]),
       gl.STATIC_DRAW);
-}
-
-function render() {
-  gl.resizeCanvasToDisplaySize(canvas, pixelRatio);
-  const halfHeight = gl.canvas.height / 2;
-  const width = gl.canvas.width;
-
-  // clear the screen.
-  gl.disable(gl.SCISSOR_TEST);
-  gl.colorMask(true, true, true, true);
-  gl.clearColor(0, 0, 0, 0);
-  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-
-  gl.viewport(0, halfHeight, width, halfHeight);
-
-  gl.enable(gl.DEPTH_TEST);
-  gl.enable(gl.BLEND);
-  gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-
-  var aspect = gl.canvas.clientWidth / (gl.canvas.clientHeight / 2);
-
-  m4.perspective(
-      degToRad(60),
-      aspect,
-      1,
-      5000,
-      projection);
-
-  var f = Math.max(30, fieldOfView) - 30;
-  f = f / (179 - 30);
-  f = f * f * f * f;
-  f = lerp(1, 179 * 0.9, f);
-  f = 1;
-  v3.mulScalar(targetToEye, f, v3t0);
-  v3.add(v3t0, target, v3t0);
-  m4.lookAt(
-      v3t0, //eyePosition,
-      target,
-      up,
-      view);
-  m4.inverse(view, view);
-  m4.multiply(projection, view, viewProjection);
 }
 
 main();
