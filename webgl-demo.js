@@ -7,7 +7,7 @@ const settings = {
   FOV: 60,
   znear: 1,
   zfar: 2000,
-  aspect:2.0,
+  aspect:1.0,
   eye_seperation: 1.0,
   convergence: 100,
 };
@@ -61,11 +61,11 @@ webglLessonsUI.setupUI(document.querySelector('#ui'), settings, [
   { type: 'slider',   key: 'cameraY',    min:   1, max: 20, change: render, precision: 2, step: 0.001, },
   { type: 'slider',   key: 'cameraZ',    min:   1, max: 20, change: render, precision: 2, step: 0.001, },
   { type: 'slider',   key: 'FOV',        min:   1, max: 180, change: render, precision: 2, step: 0.001, },
-  { type: 'slider',   key: 'aspect',     min:   1.0, max: 10.0, change: render, precision: 2, step: 0.001, },
+  { type: 'slider',   key: 'aspect',     min:   0.1, max: 10.0, change: render, precision: 2, step: 0.001, },
   { type: 'slider',   key: 'znear',      min:   1.0, max: 1000.0, change: render, precision: 2, step: 0.001, },
   { type: 'slider',   key: 'zfar',       min:   1.0, max: 2000.0, change: render, precision: 2, step: 0.001, },
   { type: 'slider',   key: 'eye_seperation',    min:   1.0, max: 200.0, change: render, precision: 2, step: 0.001, },
-  { type: 'slider',   key: 'convergence',       min:   100.0, max: 5000.0, change: render, precision: 2, step: 0.001, },
+  { type: 'slider',   key: 'convergence',       min:   0.0, max: 5000.0, change: render, precision: 2, step: 0.001, },
 ]);
 function degToRad(d) {
   return d * Math.PI / 180;
@@ -93,7 +93,7 @@ const planeUniforms = {
 const sphereUniforms = {
   u_colorMult: [1, 0.5, 0.5, 1],  // pink
   u_texture: checkerboardTexture,
-  u_world: m4.translation(0, 0, 0),
+  u_world: m4.translation(0, 2, 0),
 };
 
 
@@ -109,44 +109,85 @@ function render() {
   // Clear the canvas AND the depth buffer.
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
-  // Compute the projection matrix
-  const projectionMatrix = m4.perspective(degToRad(settings.FOV), settings.aspect, settings.znear, settings.zfar);
-
-  // Compute the camera's matrix using look at.
   const cameraPosition = [settings.cameraX, settings.cameraY, settings.cameraZ];
   const target = [0, 0, 0];
   const up = [0, 1, 0];
   const cameraMatrix = m4.lookAt(cameraPosition, target, up);
   const worldMatrix = m4.translation(0, 0, 0)
-  drawScene(projectionMatrix, m4.inverse(cameraMatrix), worldMatrix);
+
+  const top = Math.tan(degToRad(settings.FOV)* 0.5) * settings.znear;
+  const bottom = -top;
+  const left = settings.aspect * bottom;
+  const right = settings.aspect * top;
+  const width = Math.abs(right - left);
+  const height = Math.abs(top - bottom);
+  drawScene(m4.frustum(left, right, bottom, top, settings.znear, settings.zfar), m4.inverse(cameraMatrix), worldMatrix);
 }
 
 function applyLeftFrustum() {
-  var top, bottom, left, right
-  gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+  webglUtils.resizeCanvasToDisplaySize(gl.canvas);
+
+  // Tell WebGL how to convert from clip space to pixels
+  gl.viewport(settings.eye_seperation/2, 0, gl.canvas.width, gl.canvas.height);
 
   gl.enable(gl.CULL_FACE);
   gl.enable(gl.DEPTH_TEST);
 
   // Clear the canvas AND the depth buffer.
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-  top = settings.znear * Math.tan(settings.FOV / 2);
-  bottom = -top;
 
-  var a = settings.aspect * Math.tan(settings.FOV / 2);
-  var b = a - settings.eye_seperation / 2;
-  var c = a + settings.eye_seperation / 2;
-  var left = -c * settings.znear / settings.convergence;
-  var right = b * settings.znear / settings.convergence;
-  const projectionMatrix = m4.perspective(degToRad(settings.FOV), settings.aspect, settings.znear, settings.zfar);
-  const viewMatrix = m4.frustum(left, right, bottom, top, settings.znear, settings.zfar);
-  var worldMatrix = m4.identity();
-  worldMatrix = m4.translate(worldMatrix, settings.eye_seperation / 2, 0.0, 0.0);
-  drawScene(projectionMatrix, viewMatrix, worldMatrix);
+  const cameraPosition = [settings.cameraX, settings.cameraY, settings.cameraZ];
+  const target = [0, 0, 0];
+  const up = [0, 1, 0];
+  const cameraMatrix = m4.lookAt(cameraPosition, target, up);
+  const worldMatrix = m4.translation(0, 0, 0)
+
+  const top = Math.tan(degToRad(settings.FOV)* 0.5) * settings.znear;
+  const bottom = -top;
+
+  var a = settings.aspect * Math.tan(degToRad(settings.FOV)/2) * settings.convergence;
+  
+  var b = a - settings.eye_seperation/2;
+  var c = a + settings.eye_seperation/2;
+
+  const left = -b * settings.znear / settings.convergence;
+  const right = c * settings.znear / settings.convergence;
+
+  const width = Math.abs(right - left);
+  const height = Math.abs(top - bottom);
+  drawScene(m4.frustum(left, right, bottom, top, settings.znear, settings.zfar), m4.inverse(cameraMatrix), worldMatrix);
 }
 
 function applyRightFrustum() {
-  alert('Right clicked')
+  webglUtils.resizeCanvasToDisplaySize(gl.canvas);
+
+  // Tell WebGL how to convert from clip space to pixels
+  gl.viewport(-settings.eye_seperation/2, 0, gl.canvas.width, gl.canvas.height);
+
+  gl.enable(gl.CULL_FACE);
+  gl.enable(gl.DEPTH_TEST);
+
+  // Clear the canvas AND the depth buffer.
+  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+  const cameraPosition = [settings.cameraX, settings.cameraY, settings.cameraZ];
+  const target = [0, 0, 0];
+  const up = [0, 1, 0];
+  const cameraMatrix = m4.lookAt(cameraPosition, target, up);
+  const worldMatrix = m4.translation(0, 0, 0)
+
+  const top = Math.tan(degToRad(settings.FOV)* 0.5) * settings.znear;
+  const bottom = -top;
+
+  var a = settings.aspect * Math.tan(degToRad(settings.FOV)/2) * settings.convergence;
+  
+  var b = a - settings.eye_seperation/2;
+  var c = a + settings.eye_seperation/2;
+
+  const left = -c * settings.znear / settings.convergence;
+  const right = b * settings.znear / settings.convergence;
+
+  drawScene(m4.frustum(left, right, bottom, top, settings.znear, settings.zfar), m4.inverse(cameraMatrix), worldMatrix);
 }
 
 function drawScene(projectionMatrix, viewMatrix, worldMatrix) {
@@ -157,10 +198,11 @@ function drawScene(projectionMatrix, viewMatrix, worldMatrix) {
   webglUtils.setUniforms(textureProgramInfo, {
     u_view: viewMatrix,
     u_projection: projectionMatrix,
-    u_world: worldMatrix
+    u_world: m4.translation(2, 0, 0),
   });
 
-  // ------ Draw the sphere --------
+  
+// ------ Draw the sphere --------
 
   // Setup all the needed attributes.
   webglUtils.setBuffersAndAttributes(gl, textureProgramInfo, sphereBufferInfo);
