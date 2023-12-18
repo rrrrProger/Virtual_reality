@@ -1,60 +1,51 @@
-<!doctype html>
-<html lang="en">
-    <script  id="vertex-shader-3d" type="x-shader/x-vertex">
-        attribute vec4 a_position;
-        attribute vec4 a_color;
-        
-        uniform mat4 u_matrix;
-        uniform float u_fudgeFactor;
-        
-        varying vec4 v_color;
-        
-        void main() {
-          // Multiply the position by the matrix.
-          vec4 position = u_matrix * a_position;
-        
-          // Adjust the z to divide by
-          float zToDivideBy = 1.0 + position.z * u_fudgeFactor;
-        
-          // Divide x and y by z.
-          gl_Position = vec4(position.xy / zToDivideBy, position.zw);
-        
-          // Pass the color to the fragment shader.
-          v_color = a_color;
-        }
-        </script>
-        <!-- fragment shader -->
-        <script  id="fragment-shader-3d" type="x-shader/x-fragment">
-        precision mediump float;
-        
-        // Passed in from the vertex shader.
-        varying vec4 v_color;
-        
-        void main() {
-           gl_FragColor = v_color;
-        }
-        </script><!--
-        for most samples webgl-utils only provides shader compiling/linking and
-        canvas resizing because why clutter the examples with code that's the same in every sample.
-        See https://webglfundamentals.org/webgl/lessons/webgl-boilerplate.html
-        and https://webglfundamentals.org/webgl/lessons/webgl-resizing-the-canvas.html
-        for webgl-utils, m3, m4, and webgl-lessons-ui.
-        -->
-        <script src="https://webglfundamentals.org/webgl/resources/webgl-utils.js"></script>
-        <script src="https://webglfundamentals.org/webgl/resources/webgl-lessons-ui.js"></script>
-        <script src="https://cdnjs.cloudflare.com/ajax/libs/twgl.js/4.19.5/twgl.min.js"></script>
-        <script src="https://webgfundamentals.org/webgl/resources/m3.js"></script>
-        <script src="https://webgfundamentals.org/webgl/resources/m4.js"></script>
-        <script src="https://twgljs.org/dist/3.x/twgl-full.min.js"></script>
-        <script src="webgl-demo.js" type="module"></script>
-  <head>
-    <meta charset="utf-8" />
-    <title>WebGL Demo</title>
-    <!-- vertex shader -->
+<link rel="stylesheet" href="style.css">
+<canvas id="canvas"></canvas>
+<div id="uiContainer">
+  <div id="ui">
+  </div>
+</div>
+<button id='applyLeft'>applyLeftFrustum</button>
+<button id='applyRight'>applyRightFrustum</button>
+<!-- vertex shader -->
+<script  id="vertex-shader-3d" type="x-shader/x-vertex">
+attribute vec4 a_position;
+attribute vec2 a_texcoord;
 
-  </head>
+uniform mat4 u_projection;
+uniform mat4 u_view;
+uniform mat4 u_world;
 
-  <body>
-    <canvas id="glcanvas" width="640" height="480"></canvas>
-  </body>
-</html>
+varying vec2 v_texcoord;
+
+void main() {
+  gl_Position = u_projection * u_view * u_world * a_position;
+
+  // Pass the texture coord to the fragment shader.
+  v_texcoord = a_texcoord;
+}
+</script>
+<!-- fragment shader -->
+<script  id="fragment-shader-3d" type="x-shader/x-fragment">
+precision mediump float;
+
+// Passed in from the vertex shader.
+varying vec2 v_texcoord;
+
+uniform vec4 u_colorMult;
+uniform sampler2D u_texture;
+
+void main() {
+  gl_FragColor = texture2D(u_texture, v_texcoord) * u_colorMult;
+}
+</script><!--
+for most samples webgl-utils only provides shader compiling/linking and
+canvas resizing because why clutter the examples with code that's the same in every sample.
+See https://webglfundamentals.org/webgl/lessons/webgl-boilerplate.html
+and https://webglfundamentals.org/webgl/lessons/webgl-resizing-the-canvas.html
+for webgl-utils, m3, m4, and webgl-lessons-ui.
+-->
+<script src="https://webglfundamentals.org/webgl/resources/webgl-lessons-ui.js"></script>
+<script src="https://webglfundamentals.org/webgl/resources/webgl-utils.js"></script>
+<script src="https://webglfundamentals.org/webgl/resources/m4.js"></script>
+<script src="https://webglfundamentals.org/webgl/resources/primitives.js"></script>
+<script src="webgl-demo.js"></script>
