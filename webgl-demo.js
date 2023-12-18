@@ -106,8 +106,9 @@ function render() {
   gl.enable(gl.CULL_FACE);
   gl.enable(gl.DEPTH_TEST);
 
-  // Clear the canvas AND the depth buffer.
-  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+  gl.clearColor(0.0, 0.0, 0.0, 0.0);
+  gl.clearDepth(1);
+  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
 
   const cameraPosition = [settings.cameraX, settings.cameraY, settings.cameraZ];
   const target = [0, 0, 0];
@@ -134,7 +135,13 @@ function applyLeftFrustum() {
   gl.enable(gl.DEPTH_TEST);
 
   // Clear the canvas AND the depth buffer.
-  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+  let red = 1.0;
+  let green = 0.0;
+  let blue = 0.0;
+  let alpha = 0.0;
+  gl.clearColor(0.0, 1.0, 1.0, 1.0);
+  gl.clearDepth(1);
+  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
 
   const cameraPosition = [settings.cameraX, settings.cameraY, settings.cameraZ];
   const target = [0, 0, 0];
@@ -168,7 +175,13 @@ function applyRightFrustum() {
   gl.enable(gl.DEPTH_TEST);
 
   // Clear the canvas AND the depth buffer.
-  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+  let red = 0;
+  let green = 1;
+  let blue = 1;
+  let alpha = 0;
+  gl.clearColor(1.0, 0.0, 0.0, 1.0);
+  gl.clearDepth(1);
+  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
 
   const cameraPosition = [settings.cameraX, settings.cameraY, settings.cameraZ];
   const target = [0, 0, 0];
