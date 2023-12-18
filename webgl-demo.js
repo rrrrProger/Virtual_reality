@@ -9,7 +9,7 @@ const settings = {
   zfar: 2000,
   aspect:2.0,
   eye_seperation: 1.0,
-  convergence: 100
+  convergence: 100,
 };
 
 const gl = canvas.getContext('webgl');
@@ -64,7 +64,8 @@ webglLessonsUI.setupUI(document.querySelector('#ui'), settings, [
   { type: 'slider',   key: 'aspect',     min:   1.0, max: 10.0, change: render, precision: 2, step: 0.001, },
   { type: 'slider',   key: 'znear',      min:   1.0, max: 1000.0, change: render, precision: 2, step: 0.001, },
   { type: 'slider',   key: 'zfar',       min:   1.0, max: 2000.0, change: render, precision: 2, step: 0.001, },
-  { type: 'slider',   key: 'eye_seperation',       min:   1.0, max: 200.0, change: render, precision: 2, step: 0.001, },
+  { type: 'slider',   key: 'eye_seperation',    min:   1.0, max: 200.0, change: render, precision: 2, step: 0.001, },
+  { type: 'slider',   key: 'convergence',       min:   100.0, max: 5000.0, change: render, precision: 2, step: 0.001, },
 ]);
 function degToRad(d) {
   return d * Math.PI / 180;
@@ -92,7 +93,7 @@ const planeUniforms = {
 const sphereUniforms = {
   u_colorMult: [1, 0.5, 0.5, 1],  // pink
   u_texture: checkerboardTexture,
-  u_world: m4.translation(2, 3, 4),
+  u_world: m4.translation(0, 0, 0),
 };
 
 
@@ -117,12 +118,18 @@ function render() {
   const up = [0, 1, 0];
   const cameraMatrix = m4.lookAt(cameraPosition, target, up);
   const worldMatrix = m4.translation(0, 0, 0)
-  drawScene(projectionMatrix, cameraMatrix, worldMatrix);
+  drawScene(projectionMatrix, m4.inverse(cameraMatrix), worldMatrix);
 }
 
 function applyLeftFrustum() {
   var top, bottom, left, right
+  gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
 
+  gl.enable(gl.CULL_FACE);
+  gl.enable(gl.DEPTH_TEST);
+
+  // Clear the canvas AND the depth buffer.
+  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
   top = settings.znear * Math.tan(settings.FOV / 2);
   bottom = -top;
 
@@ -132,22 +139,18 @@ function applyLeftFrustum() {
   var left = -c * settings.znear / settings.convergence;
   var right = b * settings.znear / settings.convergence;
   const projectionMatrix = m4.perspective(degToRad(settings.FOV), settings.aspect, settings.znear, settings.zfar);
-  const vieMatrix = m4.frustum(left, right, bottom, top, settings.znear, settings.zfar);
-  const cameraMatrix = m4.inverse(vieMatrix)
-//  const cameraMatrix = m4.lookAt(cameraPosition, target, up);
-  let worldMatrix = m4.identity();
+  const viewMatrix = m4.frustum(left, right, bottom, top, settings.znear, settings.zfar);
+  var worldMatrix = m4.identity();
   worldMatrix = m4.translate(worldMatrix, settings.eye_seperation / 2, 0.0, 0.0);
-  drawScene(projectionMatrix, cameraMatrix, worldMatrix);
+  drawScene(projectionMatrix, viewMatrix, worldMatrix);
 }
 
 function applyRightFrustum() {
   alert('Right clicked')
 }
 
-function drawScene(projectionMatrix, cameraMatrix, worldMatrix) {
+function drawScene(projectionMatrix, viewMatrix, worldMatrix) {
   // Make a view matrix from the camera matrix.
-  const viewMatrix = m4.inverse(cameraMatrix);
-
   gl.useProgram(textureProgramInfo.program);
 
   // Set the uniform that both the sphere and the plane share
