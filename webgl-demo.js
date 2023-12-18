@@ -116,8 +116,8 @@ function render() {
   const target = [0, 0, 0];
   const up = [0, 1, 0];
   const cameraMatrix = m4.lookAt(cameraPosition, target, up);
-
-  drawScene(projectionMatrix, cameraMatrix);
+  const worldMatrix = m4.translation(0, 0, 0)
+  drawScene(projectionMatrix, cameraMatrix, worldMatrix);
 }
 
 function applyLeftFrustum() {
@@ -131,19 +131,20 @@ function applyLeftFrustum() {
   var c = a + settings.eye_seperation / 2;
   var left = -c * settings.znear / settings.convergence;
   var right = b * settings.znear / settings.convergence;
-  const projectionMatrix = m4.frustum(left, right, bottom, top, settings.znear, settings.zfar);
-  const cameraPosition = [settings.cameraX, settings.cameraY, settings.cameraZ];
-  const target = [0, 0, 0];
-  const up = [0, 1, 0];
-
-  drawScene(projectionMatrix, cameraPosition);
+  const projectionMatrix = m4.perspective(degToRad(settings.FOV), settings.aspect, settings.znear, settings.zfar);
+  const vieMatrix = m4.frustum(left, right, bottom, top, settings.znear, settings.zfar);
+  const cameraMatrix = m4.inverse(vieMatrix)
+//  const cameraMatrix = m4.lookAt(cameraPosition, target, up);
+  let worldMatrix = m4.identity();
+  worldMatrix = m4.translate(worldMatrix, settings.eye_seperation / 2, 0.0, 0.0);
+  drawScene(projectionMatrix, cameraMatrix, worldMatrix);
 }
 
 function applyRightFrustum() {
   alert('Right clicked')
 }
 
-function drawScene(projectionMatrix, cameraMatrix) {
+function drawScene(projectionMatrix, cameraMatrix, worldMatrix) {
   // Make a view matrix from the camera matrix.
   const viewMatrix = m4.inverse(cameraMatrix);
 
@@ -153,6 +154,7 @@ function drawScene(projectionMatrix, cameraMatrix) {
   webglUtils.setUniforms(textureProgramInfo, {
     u_view: viewMatrix,
     u_projection: projectionMatrix,
+    u_world: worldMatrix
   });
 
   // ------ Draw the sphere --------
