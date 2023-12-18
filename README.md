@@ -15,4 +15,4 @@ For example let's try to change FOV, ratio and znear and apply left and right fr
 ![Alt text](image-3.png)
 ![Alt text](image-4.png)
 Photo of me wearing the 3D glasses:
-![Alt text](image-5.png)
+![Alt text](image-6.png)
