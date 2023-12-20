@@ -65,69 +65,6 @@ if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
   throw `Could not compile WebGL program. \n\n${info}`;
 }
 
-function createTriangle() {
-    let modelProjection = [
-      1, 0, 0, 0,
-      0, 1, 0, 0,
-      0, 0, 1, 0,
-      0, 0, 0, 1
-    ]
-    let modelView = [
-      1, 0, 0, 0,
-      0, 1, 0, 0,
-      0, 0, 1, 0,
-      0, 0, 0, 1
-    ]
-
-    var buffer = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-    gl.bufferData(gl.ARRAY_BUFFER,
-  new Float32Array([-1, -1, -0.12000000476837158, 1, 
-  0, 1, -0.12000000476837158, 1, 
-  1, -1, -0.12000000476837158, 1]),
-    gl.STATIC_DRAW);
-
-    var vert_shader = gl.createShader(gl.VERTEX_SHADER);
-
-    gl.shaderSource(vert_shader,"attribute vec4 vertex;  uniform mat4 ModelViewMatrix; uniform mat4 ModelProjectionMatrix; void main(void) {gl_Position = ModelProjectionMatrix * ModelViewMatrix * vertex;}");
-
-
-    gl.compileShader(vert_shader);
-    if( !gl.getShaderParameter(vert_shader,gl.COMPILE_STATUS ) ) {
-        throw 0;
-    }
-
-    var frag_shader = gl.createShader(gl.FRAGMENT_SHADER);
-    gl.shaderSource(frag_shader,"void main(void) { gl_FragColor = vec4(1.0,1.0,1.0,1.0); } \n");
-
-    gl.compileShader(frag_shader);
-    if( !gl.getShaderParameter(frag_shader,gl.COMPILE_STATUS) ) {
-        throw 1;
-    }
-
-    var program = gl.createProgram();
-    gl.attachShader(program,vert_shader);
-    gl.attachShader(program,frag_shader);
-    gl.linkProgram(program);
-    if( !gl.getProgramParameter(program,gl.LINK_STATUS) ) {
-        throw 2;
-    }
-    gl.useProgram(program);
-
-    gl.uniformMatrix4fv(gl.getUniformLocation(program, "ModelProjectionMatrix"), false, modelProjection);
-    gl.uniformMatrix4fv(gl.getUniformLocation(program, "ModelViewMatrix"), false, modelView);
-    var vertexLocation = gl.getAttribLocation(program,"vertex");
-
-    gl.deleteShader(frag_shader);
-    gl.deleteShader(vert_shader);
-    gl.clear( gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT );
-
-    gl.bindBuffer(gl.ARRAY_BUFFER,buffer);
-    gl.enableVertexAttribArray(vertexLocation);
-    gl.vertexAttribPointer(vertexLocation,4, gl.FLOAT,false,0,0);
-
-    gl.drawArrays(gl.TRIANGLES,0 ,3);
-}
 /*
 webglLessonsUI.setupUI(document.querySelector('#ui'), settings, [
   { type: 'slider',   key: 'cameraX',    min: -10, max: 10, change: render, precision: 2, step: 0.001, },
@@ -141,15 +78,6 @@ webglLessonsUI.setupUI(document.querySelector('#ui'), settings, [
   { type: 'slider',   key: 'convergence',       min:   0.0, max: 5000.0, change: render, precision: 2, step: 0.001, },
 ]);
 */
-
-function drawPrimitive( primitiveType, color, vertices ) {
-  gl.enableVertexAttribArray(ver);
-  gl.bindBuffer(gl.ARRAY_BUFFER,a_coords_buffer);
-  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STREAM_DRAW);
-  gl.uniform4fv(u_color, color);
-  gl.vertexAttribPointer(a_coords_loc, 3, gl.FLOAT, false, 0, 0);
-  gl.drawArrays(primitiveType, 0, vertices.length/3);
-}
 
 function StereoCamera(eyeSeperation, 
     convergence, 
@@ -228,23 +156,12 @@ function draw() {
   gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
   gl.clearDepth(1);
   
-  let modelProjection = [
-    1, 0, 0, 0,
-    1, 1, 0, 0,
-    0, 1.0, 1, 0,
-    0, 0, -1.5, 1.0
-  ]
-  let modelView = [
-    1, 0, 0, 0,
-    0, 1, 0, 0,
-    0, 0, 1, 0,
-    0, 0, 0, 1
-  ]
   var projection = m4.perspective(Math.PI / 8, 1, 8, 12);
   var modelview = spaceball.getViewMatrix();
+  var modeltranslate = m4.translate(modelview, 0.0, 0.0, -1.0);
 
   gl.uniformMatrix4fv(shProgram.iModelProjectionMatrix, false, projection);
-  gl.uniformMatrix4fv(shProgram.iModelViewMatrix, false, modelview);
+  gl.uniformMatrix4fv(shProgram.iModelViewMatrix, false, modeltranslate);
   let modelProject = m4.multiply(projection, modelview)
   /*
   // Set the values of the projection transformation
