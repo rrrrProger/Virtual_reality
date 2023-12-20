@@ -1,15 +1,16 @@
 'use strict';
 
+function degToRad(d) {
+  return d * Math.PI / 180;
+}
+
 const settings = {
-  cameraX: 2.0,
-  cameraY: 6.27,
-  cameraZ: 13.54,
-  FOV: 60,
+  fov: 10,
   znear: 1,
   zfar: 2000,
   aspect:1.0,
-  eye_seperation: 1.0,
-  convergence: 100,
+  eyeSeperation: 0.1,
+  convergence: 5000,
 };
 
 let canvas = document.querySelector("#webglcanvas");
@@ -65,19 +66,15 @@ if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
   throw `Could not compile WebGL program. \n\n${info}`;
 }
 
-/*
+
 webglLessonsUI.setupUI(document.querySelector('#ui'), settings, [
-  { type: 'slider',   key: 'cameraX',    min: -10, max: 10, change: render, precision: 2, step: 0.001, },
-  { type: 'slider',   key: 'cameraY',    min:   1, max: 20, change: render, precision: 2, step: 0.001, },
-  { type: 'slider',   key: 'cameraZ',    min:   1, max: 20, change: render, precision: 2, step: 0.001, },
-  { type: 'slider',   key: 'FOV',        min:   1, max: 180, change: render, precision: 2, step: 0.001, },
-  { type: 'slider',   key: 'aspect',     min:   0.1, max: 10.0, change: render, precision: 2, step: 0.001, },
-  { type: 'slider',   key: 'znear',      min:   1.0, max: 1000.0, change: render, precision: 2, step: 0.001, },
-  { type: 'slider',   key: 'zfar',       min:   1.0, max: 2000.0, change: render, precision: 2, step: 0.001, },
-  { type: 'slider',   key: 'eye_seperation',    min:   1.0, max: 200.0, change: render, precision: 2, step: 0.001, },
-  { type: 'slider',   key: 'convergence',       min:   0.0, max: 5000.0, change: render, precision: 2, step: 0.001, },
+  { type: 'slider',   key: 'fov',        min:   0, max: 360, change: draw, precision: 2, step: 0.001, },
+  { type: 'slider',   key: 'aspect',     min:   0.1, max: 10.0, change: draw, precision: 2, step: 0.001, },
+  { type: 'slider',   key: 'znear',      min:   1.0, max: 1000.0, change: draw, precision: 2, step: 0.001, },
+  { type: 'slider',   key: 'zfar',       min:   1.0, max: 2000.0, change: draw, precision: 2, step: 0.001, },
+  { type: 'slider',   key: 'eyeSeperation',    min:   1.0, max: 100.0, change: draw, precision: 2, step: 0.001, },
+  { type: 'slider',   key: 'convergence',       min:   0.0, max: 5000.0, change: draw, precision: 2, step: 0.001, },
 ]);
-*/
 
 function StereoCamera(eyeSeperation, 
     convergence, 
@@ -92,42 +89,41 @@ function StereoCamera(eyeSeperation,
   this.zfar = zfar;
   this.fov = fov;
   this.aspect = aspect;
-}
 
-function applyLeftFrustum(cam) 
-{
-  let top, bottom, left, right;
-  top = cam.znear * Math.tan(degToRad(cam.fov/2));
-  bottom = -top;
+  this.applyLeftFrustum = function()
+  {
+    let top, bottom, left, right;
+    top = this.znear * Math.tan(degToRad(this.fov/2));
+    bottom = -top;
 
-  let a = cam.aspect * Math.tan(cam.fov / 2) * cam.convergence;
-  let b = a - cam.eyeSeperation / 2;
-  let c = a + cam.eyeSeperation / 2;
+    let a = this.aspect * Math.tan(degToRad(this.fov / 2)) * this.convergence;
+    let b = a - this.eyeSeperation / 2;
+    let c = a + this.eyeSeperation / 2;
 
-  left = -b * cam.znear / cam.convergence;
-  right = c * cam.znear / cam.convergence;
+    left = -b * this.znear / this.convergence;
+    right = c * this.znear / this.convergence;
+    console.log('left : ', left);
+    console.log('right : ', right);
+    console.log('bottom :', bottom);
+    console.log('top: ', top);
+    return m4.frustum(left, right, bottom, top, this.znear, this.zfar);
+  }
 
-  return m4.frustum(left, right, bottom, top, cam.znear, cam.zfar);
-}
+  this.applyRightFrustum = function()
+  {
+    const top = Math.tan(degToRad(this.fov)* 0.5) * this.znear;
+    const bottom = -top;
 
-function applyRightFrustum(cam)
-{
-  const top = Math.tan(degToRad(cam.fov)* 0.5) * cam.znear;
-  const bottom = -top;
+    var a = cam.aspect * Math.tan(degToRad(this.fov)/2) * this.convergence;
 
-  var a = cam.aspect * Math.tan(degToRad(cam.fov)/2) * cam.convergence;
+    var b = a - this.eyeSeperation/2;
+    var c = a + this.eyeSeperation/2;
 
-  var b = a - cam.eyeSeperation/2;
-  var c = a + cam.eyeSeperation/2;
+    const left = -c * this.znear / this.convergence;
+    const right = b * this.znear / this.convergence;
 
-  const left = -c * cam.znear / cam.convergence;
-  const right = b * cam.znear / cam.convergence;
-
-  return m4.frustum(left, right, bottom, top, cam.znear, cam.zfar);
-}
-
-function degToRad(d) {
-  return d * Math.PI / 180;
+    return m4.frustum(left, right, bottom, top, cam.znear, cam.zfar);
+  }
 }
 
 function Model(name) {
@@ -155,14 +151,21 @@ function draw() {
   gl.enable(gl.DEPTH_TEST);
   gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
   gl.clearDepth(1);
+
+  var modelview = spaceball.getViewMatrix();
+  var translatetozero = m4.translation(0.0, 0.0, -1.0);
+  var projection = m4.perspective(Math.PI / 8, 1, 8, 12);
+
   
+  /*
   var projection = m4.perspective(Math.PI / 8, 1, 8, 12);
   var modelview = spaceball.getViewMatrix();
-  var modeltranslate = m4.translate(modelview, 0.0, 0.0, -1.0);
+  var rotatetozero = m4.axisRotation([0.707, 0.707, 0], 0.7)
+  var translatetozero = m4.translation(0.0, 0.0, -1.0);
 
   gl.uniformMatrix4fv(shProgram.iModelProjectionMatrix, false, projection);
-  gl.uniformMatrix4fv(shProgram.iModelViewMatrix, false, modeltranslate);
-  let modelProject = m4.multiply(projection, modelview)
+  gl.uniformMatrix4fv(shProgram.iModelViewMatrix, false, matAccum1);
+  */
   /*
   // Set the values of the projection transformation
   let projection = m4.perspective(Math.PI / 8, 1, 8, 12);
@@ -181,20 +184,20 @@ function draw() {
   
   gl.uniform4fv(shProgram.iColor, [1,1,0,1]);
   
-  /*
-  let matrleftfrust = applyLeftFrustum(stereoCam);
+  
+  let matrleftfrust = stereoCam.applyLeftFrustum();
+  console.log(matrleftfrust)
   gl.uniformMatrix4fv(shProgram.iModelProjectionMatrix, false, matrleftfrust);
 
-  let matAccum0 = m4.multiply(rotateToPointZero, modelView);
-  let matAccum1 = m4.multiply(translateToPointZero, matAccum0);
+  let matAccum1 = m4.multiply(modelview, translatetozero);
 
   let translateLeftEye = m4.translation(-stereoCam.eyeSeperation/2, 0, 0);
-  let modelViewLeft = m4.multiply(translateLeftEye, matAccum1);
+  let modelViewLeft = m4.multiply(matAccum1, translateLeftEye);
 
   gl.uniformMatrix4fv(shProgram.iModelViewMatrix, false, modelViewLeft);
 
-  gl.colorMask(true, false, false, false);
-  */
+//  gl.colorMask(true, false, false, false);
+  
 
   surface.Draw();
 
@@ -246,12 +249,12 @@ function initGL() {
   surface.BufferData(createSurfaceData());
 
   stereoCam = new StereoCamera(
-    70.0,
-    5000.0,
-    degToRad(60.0),
-    1.5,
-    10.0,
-    20000.0
+    settings.eyeSeperation, //70
+    settings.convergence, //5000
+    settings.fov, //60
+    settings.aspect, //1.5
+    settings.znear, //1
+    settings.zfar // 20000
   );
   gl.enable(gl.DEPTH_TEST);
 }
