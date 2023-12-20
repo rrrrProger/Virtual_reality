@@ -8,35 +8,28 @@
 <button id='applyRight'>applyRightFrustum</button>
 <!-- vertex shader -->
 <script  id="vertex-shader-3d" type="x-shader/x-vertex">
-attribute vec4 a_position;
-attribute vec2 a_texcoord;
-
-uniform mat4 u_projection;
-uniform mat4 u_view;
-uniform mat4 u_world;
-
-varying vec2 v_texcoord;
+const vertexShaderSource=`
+attribuite vec3 vertex;
+uniform mat4 ModelViewMatrix;
+uniform mat4 ModelProjectonMatrix;
 
 void main() {
-  gl_Position = u_projection * u_view * u_world * a_position;
-
-  // Pass the texture coord to the fragment shader.
-  v_texcoord = a_texcoord;
-}
+    gl_Position = ModelViewMatrix * ModelProjectonMatrix * vec4(vertex, 1.0);
+}`
 </script>
 <!-- fragment shader -->
 <script  id="fragment-shader-3d" type="x-shader/x-fragment">
-precision mediump float;
+const fragmentShaderSource=`
+#ifdef GL_FRAGMENT_PRECISION_HIGH 
+    precision highp float;
+#else
+    precision mediump float;
+#endif
 
-// Passed in from the vertex shader.
-varying vec2 v_texcoord;
-
-uniform vec4 u_colorMult;
-uniform sampler2D u_texture;
-
+uniform vec4 color;
 void main() {
-  gl_FragColor = texture2D(u_texture, v_texcoord) * u_colorMult;
-}
+    gl_FragColor = color;
+}`
 </script><!--
 for most samples webgl-utils only provides shader compiling/linking and
 canvas resizing because why clutter the examples with code that's the same in every sample.

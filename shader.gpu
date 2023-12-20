@@ -1,0 +1,20 @@
+const vertexShaderSource = `
+attribuite vec3 vertex;
+uniform mat4 ModelViewMatrix;
+uniform mat4 ModelProjectonMatrix;
+
+void main() {
+    gl_Position = ModelViewMatrix * ModelProjectonMatrix * vec4(vertex, 1.0);
+}
+`;
+const fragmentShaderSource = `
+#ifdef GL_FRAGMENT_PRECISION_HIGH 
+    precision highp float;
+#else
+    precision mediump float;
+#endif
+
+uniform vec4 color;
+void main() {
+    gl_FragColor = color;
+}`;
