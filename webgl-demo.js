@@ -12,12 +12,14 @@ const settings = {
   convergence: 100,
 };
 
-let gl = canvas.getContext('webgl');  // The WebGL
+let canvas = document.querySelector("#webglcanvas");
+let gl = canvas.getContext("webgl");
 let stereoCam // Object holding stereo camera calc params.
 let spaceball // a simple rotator object
 let surface
 let shProgram
-
+let a_coords_loc;          // Location of the a_coords attribute variable in the shader program.
+let a_coords_buffer;       // Buffer to hold the values for a_coords.
 // Vertex shader
 var vshader = `
 attribute vec3 vertex;
@@ -51,7 +53,7 @@ var fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
 gl.shaderSource(fragmentShader, fshader);
 let fragmentShaderCompiled = gl.compileShader(fragmentShader);
 
-const program = gl.createProgram();
+var program = gl.createProgram();
 
 // Attach pre-existing shaders
 gl.attachShader(program, vertexShader);
@@ -63,6 +65,69 @@ if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
   throw `Could not compile WebGL program. \n\n${info}`;
 }
 
+function createTriangle() {
+    let modelProjection = [
+      1, 0, 0, 0,
+      0, 1, 0, 0,
+      0, 0, 1, 0,
+      0, 0, 0, 1
+    ]
+    let modelView = [
+      1, 0, 0, 0,
+      0, 1, 0, 0,
+      0, 0, 1, 0,
+      0, 0, 0, 1
+    ]
+
+    var buffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+    gl.bufferData(gl.ARRAY_BUFFER,
+  new Float32Array([-1, -1, -0.12000000476837158, 1, 
+  0, 1, -0.12000000476837158, 1, 
+  1, -1, -0.12000000476837158, 1]),
+    gl.STATIC_DRAW);
+
+    var vert_shader = gl.createShader(gl.VERTEX_SHADER);
+
+    gl.shaderSource(vert_shader,"attribute vec4 vertex;  uniform mat4 ModelViewMatrix; uniform mat4 ModelProjectionMatrix; void main(void) {gl_Position = ModelViewMatrix * ModelProjectionMatrix * vertex;}");
+
+
+    gl.compileShader(vert_shader);
+    if( !gl.getShaderParameter(vert_shader,gl.COMPILE_STATUS ) ) {
+        throw 0;
+    }
+
+    var frag_shader = gl.createShader(gl.FRAGMENT_SHADER);
+    gl.shaderSource(frag_shader,"void main(void) { gl_FragColor = vec4(1.0,1.0,1.0,1.0); } \n");
+
+    gl.compileShader(frag_shader);
+    if( !gl.getShaderParameter(frag_shader,gl.COMPILE_STATUS) ) {
+        throw 1;
+    }
+
+    var program = gl.createProgram();
+    gl.attachShader(program,vert_shader);
+    gl.attachShader(program,frag_shader);
+    gl.linkProgram(program);
+    if( !gl.getProgramParameter(program,gl.LINK_STATUS) ) {
+        throw 2;
+    }
+    gl.useProgram(program);
+
+    gl.uniformMatrix4fv(gl.getUniformLocation(program, "ModelProjectionMatrix"), false, modelProjection);
+    gl.uniformMatrix4fv(gl.getUniformLocation(program, "ModelViewMatrix"), false, modelView);
+    var vertexLocation = gl.getAttribLocation(program,"vertex");
+
+    gl.deleteShader(frag_shader);
+    gl.deleteShader(vert_shader);
+    gl.clear( gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT );
+
+    gl.bindBuffer(gl.ARRAY_BUFFER,buffer);
+    gl.enableVertexAttribArray(vertexLocation);
+    gl.vertexAttribPointer(vertexLocation,4, gl.FLOAT,false,0,0);
+
+    gl.drawArrays(gl.TRIANGLES,0 ,3);
+}
 /*
 webglLessonsUI.setupUI(document.querySelector('#ui'), settings, [
   { type: 'slider',   key: 'cameraX',    min: -10, max: 10, change: render, precision: 2, step: 0.001, },
@@ -76,6 +141,16 @@ webglLessonsUI.setupUI(document.querySelector('#ui'), settings, [
   { type: 'slider',   key: 'convergence',       min:   0.0, max: 5000.0, change: render, precision: 2, step: 0.001, },
 ]);
 */
+
+function drawPrimitive( primitiveType, color, vertices ) {
+  gl.enableVertexAttribArray(ver);
+  gl.bindBuffer(gl.ARRAY_BUFFER,a_coords_buffer);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STREAM_DRAW);
+  gl.uniform4fv(u_color, color);
+  gl.vertexAttribPointer(a_coords_loc, 3, gl.FLOAT, false, 0, 0);
+  gl.drawArrays(primitiveType, 0, vertices.length/3);
+}
+
 function StereoCamera(eyeSeperation, 
     convergence, 
     fov, 
@@ -134,7 +209,7 @@ function Model(name) {
 
   this.BufferData = function(vertices) {
     gl.bindBuffer(gl.ARRAY_BUFFER, this.iVertexBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STREAM_DRAW);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
 
     this.count = vertices.length / 3;
   }
@@ -144,12 +219,15 @@ function Model(name) {
     gl.vertexAttribPointer(shProgram.iAttribVertex, 3, gl.FLOAT, false, 0, 0);
     gl.enableVertexAttribArray(shProgram.iAttribVertex);
 
-    gl.drawArrays(gl.LINE_STRIP, 0, this.count);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
   }
 }
 
 function draw() {
-  gl.clearColor(0, 0, 0, 1);
+  /*
+  webglUtils.resizeCanvasToDisplaySize(gl.canvas);
+  gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+  gl.clearColor(0, 0, 0, 0);
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
   let rotateToPointZero = m4.axisRotation([0.707, 0.707, 0], 0.7);
@@ -171,10 +249,12 @@ function draw() {
 
   //Draw the six faces of a cube
   */
+  
+  /*
   gl.uniform4fv(shProgram.iColor, [1,1,0,1]);
-
+  
   let matrleftfrust = applyLeftFrustum(stereoCam);
-  gl.uniformMatrix4fv(shProgram.iProjectionMatrix, false, matrleftfrust);
+  gl.uniformMatrix4fv(shProgram.iModelProjectionMatrix, false, matrleftfrust);
 
   let matAccum0 = m4.multiply(rotateToPointZero, modelView);
   let matAccum1 = m4.multiply(translateToPointZero, matAccum0);
@@ -185,24 +265,33 @@ function draw() {
   gl.uniformMatrix4fv(shProgram.iModelViewMatrix, false, modelViewLeft);
 
   gl.colorMask(true, false, false, false);
+  
   surface.Draw();
 
-  gl.clear(gl.DEPTH_BUFFER_BIT);
-  gl.colorMask(false, true, true, false);
+//  gl.clear(gl.DEPTH_BUFFER_BIT);
+//  gl.colorMask(false, true, true, false);
 
+  /*
   let matrightfrustum = applyRightFrustum(stereoCam);
-  gl.uniformMatrix4fv(shProgram.iProjectionMatrix, false, matrightfrustum);
+  gl.uniformMatrix4fv(shProgram.iModelProjectionMatrix, false, matrightfrustum);
 
   let translateRightEye = m4.translation(stereoCam.eyeSeperation / 2, 0, 0);
   let modelViewRight = m4.multiply(translateRightEye, matAccum1);
 
   gl.uniformMatrix4fv(shProgram.iModelViewMatrix, false, modelViewRight);
+  */
+//  surface.Draw();
+    gl.clearColor(1,0,0,1);
+    gl.enable(gl.DEPTH_TEST);
+    gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+    gl.clearDepth(1);
+
+    createTriangle();
+
 }
 
 function main() {
   // Get A WebGL context
-  /** @type {HTMLCanvasElement} */
-  const canvas = document.querySelector('#canvas');
   if (!gl) {
     return;
   }
@@ -219,7 +308,8 @@ function createSurfaceData()
     vertexList.push( Math.sin(degToRad(i), 1, Math.cos(degToRad(i))));
     vertexList.push( Math.sin(degToRad(i), 0, Math.cos(degToRad(i))))
   }
-  return vertexList
+
+  return vertexList;
 }
 
 function initGL() {
@@ -236,8 +326,6 @@ function initGL() {
   surface = new Model("Surface");
   surface.BufferData(createSurfaceData());
 
-  gl.enable(gl.DEPTH_TEST);
-
   stereoCam = new StereoCamera(
     70.0,
     5000.0,
@@ -246,6 +334,7 @@ function initGL() {
     10.0,
     20000.0
   );
+  gl.enable(gl.DEPTH_TEST);
 }
 
 function ShaderProgram(name, program) {
@@ -257,15 +346,11 @@ function ShaderProgram(name, program) {
   this.iAttribVertex = -1;
   this.iColor = -1;
   this.iModelViewMatrix = -1;
-  this.iProjectionMatrix = -1;
+  this.iModelProjectionMatrix = -1;
 
   this.Use = function() {
     gl.useProgram(this.prog);
   }
-}
-
-function createProgram(gl, vs, fs) {
-  webglUtils.createProgramFromSources(gl, [vs, fs])
 }
 
 main();
