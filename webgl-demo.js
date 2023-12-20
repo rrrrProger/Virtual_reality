@@ -20,7 +20,7 @@ let shProgram
 
 // Vertex shader
 var vshader = `
-attribuite vec3 vertex;
+attribute vec3 vertex;
 uniform mat4 ModelViewMatrix;
 uniform mat4 ModelProjectonMatrix;
 
@@ -45,11 +45,23 @@ void main() {
 //var program = compile(gl, vshader, fshader);
 var vertexShader = gl.createShader(gl.VERTEX_SHADER);
 gl.shaderSource(vertexShader, vshader);
-gl.compileShader(vertexShader);
+let vertexShaderCompiled = gl.compileShader(vertexShader);
 
-var fragmentShader = gl.createShader(gl.VERTEX_SHADER);
+var fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
 gl.shaderSource(fragmentShader, fshader);
-gl.compileShader(fragmentShader);
+let fragmentShaderCompiled = gl.compileShader(fragmentShader);
+
+const program = gl.createProgram();
+
+// Attach pre-existing shaders
+gl.attachShader(program, vertexShader);
+gl.attachShader(program, fragmentShader);
+gl.linkProgram(program);
+
+if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+  const info = gl.getProgramInfoLog(program);
+  throw `Could not compile WebGL program. \n\n${info}`;
+}
 
 /*
 webglLessonsUI.setupUI(document.querySelector('#ui'), settings, [
@@ -64,6 +76,53 @@ webglLessonsUI.setupUI(document.querySelector('#ui'), settings, [
   { type: 'slider',   key: 'convergence',       min:   0.0, max: 5000.0, change: render, precision: 2, step: 0.001, },
 ]);
 */
+function StereoCamera(eyeSeperation, 
+    convergence, 
+    fov, 
+    aspect, 
+    znear, 
+    zfar) 
+{
+  this.eyeSeperation = eyeSeperation;
+  this.convergence = convergence;
+  this.znear = znear;
+  this.zfar = zfar;
+  this.fov = fov;
+  this.aspect = aspect;
+}
+
+function applyLeftFrustum(cam) 
+{
+  let top, bottom, left, right;
+  top = cam.znear * Math.tan(degToRad(cam.fov/2));
+  bottom = -top;
+
+  let a = cam.aspect * Math.tan(cam.fov / 2) * cam.convergence;
+  let b = a - cam.eyeSeperation / 2;
+  let c = a + cam.eyeSeperation / 2;
+
+  left = -b * cam.znear / cam.convergence;
+  right = c * cam.znear / cam.convergence;
+
+  return m4.frustum(left, right, bottom, top, cam.znear, cam.zfar);
+}
+
+function applyRightFrustum(cam)
+{
+  const top = Math.tan(degToRad(cam.fov)* 0.5) * cam.znear;
+  const bottom = -top;
+
+  var a = cam.aspect * Math.tan(degToRad(cam.fov)/2) * cam.convergence;
+
+  var b = a - cam.eyeSeperation/2;
+  var c = a + cam.eyeSeperation/2;
+
+  const left = -c * cam.znear / cam.convergence;
+  const right = b * cam.znear / cam.convergence;
+
+  return m4.frustum(left, right, bottom, top, cam.znear, cam.zfar);
+}
+
 function degToRad(d) {
   return d * Math.PI / 180;
 }
@@ -75,7 +134,7 @@ function Model(name) {
 
   this.BufferData = function(vertices) {
     gl.bindBuffer(gl.ARRAY_BUFFER, this.iVertexBuffer);
-    gl.bindBuffer(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STREAM_DRAW);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STREAM_DRAW);
 
     this.count = vertices.length / 3;
   }
@@ -114,7 +173,7 @@ function draw() {
   */
   gl.uniform4fv(shProgram.iColor, [1,1,0,1]);
 
-  let matrleftfrust = stereoCam.applyLeftFrustum();
+  let matrleftfrust = applyLeftFrustum(stereoCam);
   gl.uniformMatrix4fv(shProgram.iProjectionMatrix, false, matrleftfrust);
 
   let matAccum0 = m4.multiply(rotateToPointZero, modelView);
@@ -131,7 +190,7 @@ function draw() {
   gl.clear(gl.DEPTH_BUFFER_BIT);
   gl.colorMask(false, true, true, false);
 
-  let matrightfrustum = stereoCam.applyRightFrustum();
+  let matrightfrustum = applyRightFrustum(stereoCam);
   gl.uniformMatrix4fv(shProgram.iProjectionMatrix, false, matrightfrustum);
 
   let translateRightEye = m4.translation(stereoCam.eyeSeperation / 2, 0, 0);
@@ -147,6 +206,7 @@ function main() {
   if (!gl) {
     return;
   }
+  spaceball = new SimpleRotator(canvas, 0, 10);
   initGL();
   draw();
 }
@@ -159,64 +219,22 @@ function createSurfaceData()
     vertexList.push( Math.sin(degToRad(i), 1, Math.cos(degToRad(i))));
     vertexList.push( Math.sin(degToRad(i), 0, Math.cos(degToRad(i))))
   }
-}
-function StereoCamera(eyeSeperation, 
-                      convergence, 
-                      fov, 
-                      aspect, 
-                      znear, 
-                      zfar) {
-  this.eyeSeperation = eyeSeperation
-  this.convergence = convergence
-  this.znear = znear
-  this.zfar = zfar
-  this.fov = fov
-  this.aspect = aspect
-}
-
-function applyLeftFrustum() {
-  const top = Math.tan(degToRad(this.fov)* 0.5) * this.znear;
-  const bottom = -top;
-
-  var a = this.aspect * Math.tan(degToRad(this.fov)/2) * this.convergence;
-  
-  var b = a - this.eyeSeperation/2;
-  var c = a + this.eyeSeperation/2;
-
-  const left = -b * this.znear / this.convergence;
-  const right = c * this.znear / this.convergence;
-
-  return m4.frustum(left, right, bottom, top, this.znear, this.zfar);
-}
-
-function applyRightFrustum() {
-  const top = Math.tan(degToRad(this.fov)* 0.5) * this.znear;
-  const bottom = -top;
-
-  var a = this.aspect * Math.tan(degToRad(this.fov)/2) * this.convergence;
-  
-  var b = a - this.eyeSeperation/2;
-  var c = a + this.eyeSeperation/2;
-
-  const left = -c * this.znear / this.convergence;
-  const right = b * this.znear / this.convergence;
-
-  return m4.frustum(left, right, bottom, top, this.znear, this.zfar);
+  return vertexList
 }
 
 function initGL() {
   
-  let prog = createProgram(gl, vshader, fshader);
-  shProgram = new ShaderProgram('Basic', prog);
+//  let prog = createProgram(gl, vshader, fshader);
+  shProgram = new ShaderProgram('Basic', program);
   shProgram.Use();
 
-  shProgram.iAttribVertex = gl.getAttribLocation(prog, "vertex");
-  shProgram.iModelViewMatrix = gl.getUniformLocation(prog, "ModelViewMatrix");
-  shProgram.iModelProjectionMatrix = gl.getUniformLocation(prog, "ModelProjectonMatrix");
-  shProgram.iColor = gl.getUniformLocation(prog, "color");
+  shProgram.iAttribVertex = gl.getAttribLocation(program, "vertex");
+  shProgram.iModelViewMatrix = gl.getUniformLocation(program, "ModelViewMatrix");
+  shProgram.iModelProjectionMatrix = gl.getUniformLocation(program, "ModelProjectonMatrix");
+  shProgram.iColor = gl.getUniformLocation(program, "color");
 
   surface = new Model("Surface");
-  surface.BufferData(CreateSurfaceData());
+  surface.BufferData(createSurfaceData());
 
   gl.enable(gl.DEPTH_TEST);
 

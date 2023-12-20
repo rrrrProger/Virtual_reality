@@ -4,11 +4,9 @@
   <div id="ui">
   </div>
 </div>
-<button id='applyLeft'>applyLeftFrustum</button>
-<button id='applyRight'>applyRightFrustum</button>
 <!-- vertex shader -->
 <script  id="vertex-shader-3d" type="x-shader/x-vertex">
-const vertexShaderSource=`
+`
 attribuite vec3 vertex;
 uniform mat4 ModelViewMatrix;
 uniform mat4 ModelProjectonMatrix;
@@ -19,7 +17,7 @@ void main() {
 </script>
 <!-- fragment shader -->
 <script  id="fragment-shader-3d" type="x-shader/x-fragment">
-const fragmentShaderSource=`
+`
 #ifdef GL_FRAGMENT_PRECISION_HIGH 
     precision highp float;
 #else
@@ -41,4 +39,5 @@ for webgl-utils, m3, m4, and webgl-lessons-ui.
 <script src="https://webglfundamentals.org/webgl/resources/webgl-utils.js"></script>
 <script src="https://webglfundamentals.org/webgl/resources/m4.js"></script>
 <script src="https://webglfundamentals.org/webgl/resources/primitives.js"></script>
+<script src="./rotator.js"></script>
 <script src="webgl-demo.js"></script>

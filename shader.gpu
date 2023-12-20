@@ -1,5 +1,5 @@
 const vertexShaderSource = `
-attribuite vec3 vertex;
+attribute vec3 vertex;
 uniform mat4 ModelViewMatrix;
 uniform mat4 ModelProjectonMatrix;
 
