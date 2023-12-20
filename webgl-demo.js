@@ -215,7 +215,6 @@ function Model(name) {
   }
 
   this.Draw = function() {
-    gl.bindBuffer(gl.ARRAY_BUFFER, this.iVertexBuffer);
     gl.vertexAttribPointer(shProgram.iAttribVertex, 3, gl.FLOAT, false, 0, 0);
     gl.enableVertexAttribArray(shProgram.iAttribVertex);
 
@@ -224,16 +223,24 @@ function Model(name) {
 }
 
 function draw() {
-  /*
-  webglUtils.resizeCanvasToDisplaySize(gl.canvas);
+  gl.clearColor(1,0,0,1);
+  gl.enable(gl.DEPTH_TEST);
   gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
-  gl.clearColor(0, 0, 0, 0);
-  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-
-  let rotateToPointZero = m4.axisRotation([0.707, 0.707, 0], 0.7);
-  let translateToPointZero = m4.translation(0, 0, -10);
-
-  let modelView = spaceball.getViewMatrix();
+  gl.clearDepth(1);
+  let modelProjection = [
+    1, 0, 0, 0,
+    0, 1, 0, 0,
+    0, 0, 1, 0,
+    0, 0, 0, 1
+  ]
+  let modelView = [
+    1, 0, 0, 0,
+    0, 1, 0, 0,
+    0, 0, 1, 0,
+    0, 0, 0, 1
+  ]
+  gl.uniformMatrix4fv(shProgram.iModelProjectionMatrix, false, modelProjection);
+  gl.uniformMatrix4fv(shProgram.iModelViewMatrix, false, modelView);
   /*
   // Set the values of the projection transformation
   let projection = m4.perspective(Math.PI / 8, 1, 8, 12);
@@ -250,9 +257,9 @@ function draw() {
   //Draw the six faces of a cube
   */
   
-  /*
   gl.uniform4fv(shProgram.iColor, [1,1,0,1]);
   
+  /*
   let matrleftfrust = applyLeftFrustum(stereoCam);
   gl.uniformMatrix4fv(shProgram.iModelProjectionMatrix, false, matrleftfrust);
 
@@ -265,7 +272,8 @@ function draw() {
   gl.uniformMatrix4fv(shProgram.iModelViewMatrix, false, modelViewLeft);
 
   gl.colorMask(true, false, false, false);
-  
+  */
+
   surface.Draw();
 
 //  gl.clear(gl.DEPTH_BUFFER_BIT);
@@ -281,12 +289,6 @@ function draw() {
   gl.uniformMatrix4fv(shProgram.iModelViewMatrix, false, modelViewRight);
   */
 //  surface.Draw();
-    gl.clearColor(1,0,0,1);
-    gl.enable(gl.DEPTH_TEST);
-    gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
-    gl.clearDepth(1);
-
-    createTriangle();
 
 }
 
@@ -302,12 +304,9 @@ function main() {
 
 function createSurfaceData()
 {
-  let vertexList = [];
-
-  for (let i =0; i < 360; i++) {
-    vertexList.push( Math.sin(degToRad(i), 1, Math.cos(degToRad(i))));
-    vertexList.push( Math.sin(degToRad(i), 0, Math.cos(degToRad(i))))
-  }
+  let vertexList = [-1, -1, -0.12000000476837158, 1, 
+    0, 1, -0.12000000476837158, 1, 
+    1, -1, -0.12000000476837158, 1];
 
   return vertexList;
 }
