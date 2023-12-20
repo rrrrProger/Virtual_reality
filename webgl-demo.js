@@ -27,7 +27,7 @@ uniform mat4 ModelViewMatrix;
 uniform mat4 ModelProjectonMatrix;
 
 void main() {
-    gl_Position = ModelViewMatrix * ModelProjectonMatrix * vec4(vertex, 1.0);
+    gl_Position = ModelProjectonMatrix * ModelViewMatrix * vec4(vertex, 1.0);
 }`;
 
 // Fragment shader
@@ -89,7 +89,7 @@ function createTriangle() {
 
     var vert_shader = gl.createShader(gl.VERTEX_SHADER);
 
-    gl.shaderSource(vert_shader,"attribute vec4 vertex;  uniform mat4 ModelViewMatrix; uniform mat4 ModelProjectionMatrix; void main(void) {gl_Position = ModelViewMatrix * ModelProjectionMatrix * vertex;}");
+    gl.shaderSource(vert_shader,"attribute vec4 vertex;  uniform mat4 ModelViewMatrix; uniform mat4 ModelProjectionMatrix; void main(void) {gl_Position = ModelProjectionMatrix * ModelViewMatrix * vertex;}");
 
 
     gl.compileShader(vert_shader);
@@ -227,11 +227,12 @@ function draw() {
   gl.enable(gl.DEPTH_TEST);
   gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
   gl.clearDepth(1);
+  
   let modelProjection = [
     1, 0, 0, 0,
-    0, 1, 0, 0,
-    0, 0, 1, 0,
-    0, 0, 0, 1
+    1, 1, 0, 0,
+    0, 1.0, 1, 0,
+    0, 0, -1.5, 1.0
   ]
   let modelView = [
     1, 0, 0, 0,
@@ -239,8 +240,12 @@ function draw() {
     0, 0, 1, 0,
     0, 0, 0, 1
   ]
-  gl.uniformMatrix4fv(shProgram.iModelProjectionMatrix, false, modelProjection);
-  gl.uniformMatrix4fv(shProgram.iModelViewMatrix, false, modelView);
+  var projection = m4.perspective(Math.PI / 8, 1, 8, 12);
+  var modelview = spaceball.getViewMatrix();
+
+  gl.uniformMatrix4fv(shProgram.iModelProjectionMatrix, false, projection);
+  gl.uniformMatrix4fv(shProgram.iModelViewMatrix, false, modelview);
+  let modelProject = m4.multiply(projection, modelview)
   /*
   // Set the values of the projection transformation
   let projection = m4.perspective(Math.PI / 8, 1, 8, 12);
@@ -297,16 +302,14 @@ function main() {
   if (!gl) {
     return;
   }
-  spaceball = new SimpleRotator(canvas, 0, 10);
+  spaceball = new SimpleRotator(canvas, draw, 10);
   initGL();
   draw();
 }
 
 function createSurfaceData()
 {
-  let vertexList = [-1, -1, -0.12000000476837158, 1, 
-    0, 1, -0.12000000476837158, 1, 
-    1, -1, -0.12000000476837158, 1];
+  let vertexList = [ -1,-1,1, 1,-1,1, 1,1,1, -1,1,1 ];
 
   return vertexList;
 }
