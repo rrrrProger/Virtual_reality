@@ -9,7 +9,7 @@ const settings = {
   znear: 1,
   zfar: 2000,
   aspect:1.0,
-  eyeSeperation: 0.1,
+  eyeSeperation: 0.06,
   convergence: 5000,
 };
 
@@ -72,8 +72,8 @@ webglLessonsUI.setupUI(document.querySelector('#ui'), settings, [
   { type: 'slider',   key: 'aspect',     min:   0.1, max: 10.0, change: draw, precision: 2, step: 0.001, },
   { type: 'slider',   key: 'znear',      min:   1.0, max: 1000.0, change: draw, precision: 2, step: 0.001, },
   { type: 'slider',   key: 'zfar',       min:   1.0, max: 2000.0, change: draw, precision: 2, step: 0.001, },
-  { type: 'slider',   key: 'eyeSeperation',    min:   1.0, max: 100.0, change: draw, precision: 2, step: 0.001, },
-  { type: 'slider',   key: 'convergence',       min:   0.0, max: 5000.0, change: draw, precision: 2, step: 0.001, },
+  { type: 'slider',   key: 'eyeSeperation',    min:   0.01, max: 100.0, change: draw, precision: 2, step: 0.001, },
+  { type: 'slider',   key: 'convergence',       min:   0.0, max: 10000.0, change: draw, precision: 2, step: 0.001, },
 ]);
 
 function StereoCamera(eyeSeperation, 
@@ -102,10 +102,7 @@ function StereoCamera(eyeSeperation,
 
     left = -b * this.znear / this.convergence;
     right = c * this.znear / this.convergence;
-    console.log('left : ', left);
-    console.log('right : ', right);
-    console.log('bottom :', bottom);
-    console.log('top: ', top);
+
     return m4.frustum(left, right, bottom, top, this.znear, this.zfar);
   }
 
@@ -114,7 +111,7 @@ function StereoCamera(eyeSeperation,
     const top = Math.tan(degToRad(this.fov)* 0.5) * this.znear;
     const bottom = -top;
 
-    var a = cam.aspect * Math.tan(degToRad(this.fov)/2) * this.convergence;
+    var a = this.aspect * Math.tan(degToRad(this.fov)/2) * this.convergence;
 
     var b = a - this.eyeSeperation/2;
     var c = a + this.eyeSeperation/2;
@@ -122,7 +119,7 @@ function StereoCamera(eyeSeperation,
     const left = -c * this.znear / this.convergence;
     const right = b * this.znear / this.convergence;
 
-    return m4.frustum(left, right, bottom, top, cam.znear, cam.zfar);
+    return m4.frustum(left, right, bottom, top, this.znear, this.zfar);
   }
 }
 
@@ -142,7 +139,8 @@ function Model(name) {
     gl.vertexAttribPointer(shProgram.iAttribVertex, 3, gl.FLOAT, false, 0, 0);
     gl.enableVertexAttribArray(shProgram.iAttribVertex);
 
-    gl.drawArrays(gl.TRIANGLES, 0, 3);
+//    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    gl.drawArrays(gl.LINE_STRIP, 0, this.count);
   }
 }
 
@@ -156,35 +154,16 @@ function draw() {
   var translatetozero = m4.translation(0.0, 0.0, -1.0);
   var projection = m4.perspective(Math.PI / 8, 1, 8, 12);
 
-  
-  /*
-  var projection = m4.perspective(Math.PI / 8, 1, 8, 12);
-  var modelview = spaceball.getViewMatrix();
-  var rotatetozero = m4.axisRotation([0.707, 0.707, 0], 0.7)
-  var translatetozero = m4.translation(0.0, 0.0, -1.0);
-
-  gl.uniformMatrix4fv(shProgram.iModelProjectionMatrix, false, projection);
-  gl.uniformMatrix4fv(shProgram.iModelViewMatrix, false, matAccum1);
-  */
-  /*
-  // Set the values of the projection transformation
-  let projection = m4.perspective(Math.PI / 8, 1, 8, 12);
-
-  // Get the view from SimpleRotator
-  let modelView = spaceball.getViewMatrix();
-
-  let matAccum0 = m4.multiply(rotateToPointZero, modelView);
-  let matAccum1 = m4.multiply(translateToPointZero, matAccum0);
-
-  let modelViewProjection = m4.multiply(projection, matAccum1);
-  gl.uniformMatrix4fv(shProgram.iModelViewMatrix, false, modelViewProjection);
-
-  //Draw the six faces of a cube
-  */
-  
+  stereoCam = new StereoCamera(
+    settings.eyeSeperation, //70
+    settings.convergence, //5000
+    settings.fov, //60
+    settings.aspect, //1.5
+    settings.znear, //1
+    settings.zfar // 20000
+  );
   gl.uniform4fv(shProgram.iColor, [1,1,0,1]);
-  
-  
+
   let matrleftfrust = stereoCam.applyLeftFrustum();
   console.log(matrleftfrust)
   gl.uniformMatrix4fv(shProgram.iModelProjectionMatrix, false, matrleftfrust);
@@ -196,25 +175,25 @@ function draw() {
 
   gl.uniformMatrix4fv(shProgram.iModelViewMatrix, false, modelViewLeft);
 
-//  gl.colorMask(true, false, false, false);
-  
+  gl.colorMask(true, false, false, true);
 
   surface.Draw();
+  
+  gl.clear(gl.DEPTH_BUFFER_BIT);
+  gl.clearDepth(1);
+  gl.colorMask(false, true, true, true);
 
-//  gl.clear(gl.DEPTH_BUFFER_BIT);
-//  gl.colorMask(false, true, true, false);
-
-  /*
-  let matrightfrustum = applyRightFrustum(stereoCam);
+  
+  let matrightfrustum = stereoCam.applyRightFrustum();
+  console.log(matrightfrustum);
   gl.uniformMatrix4fv(shProgram.iModelProjectionMatrix, false, matrightfrustum);
 
   let translateRightEye = m4.translation(stereoCam.eyeSeperation / 2, 0, 0);
-  let modelViewRight = m4.multiply(translateRightEye, matAccum1);
+  let modelViewRight = m4.multiply(matAccum1, translateRightEye);
 
   gl.uniformMatrix4fv(shProgram.iModelViewMatrix, false, modelViewRight);
-  */
-//  surface.Draw();
-
+  
+  surface.Draw();
 }
 
 function main() {
@@ -228,9 +207,14 @@ function main() {
 }
 
 function createSurfaceData()
-{
-  let vertexList = [ -1,-1,1, 1,-1,1, 1,1,1, -1,1,1 ];
+{  
+  let vertexList = [];
 
+  for (let i = 0; i < 360; i++) {
+    vertexList.push( Math.sin(degToRad(i), 1, Math.cos(degToRad(i))));
+    vertexList.push( Math.sin(degToRad(i), 0, Math.cos(degToRad(i))))
+  }
+  
   return vertexList;
 }
 
@@ -248,14 +232,6 @@ function initGL() {
   surface = new Model("Surface");
   surface.BufferData(createSurfaceData());
 
-  stereoCam = new StereoCamera(
-    settings.eyeSeperation, //70
-    settings.convergence, //5000
-    settings.fov, //60
-    settings.aspect, //1.5
-    settings.znear, //1
-    settings.zfar // 20000
-  );
   gl.enable(gl.DEPTH_TEST);
 }
 
