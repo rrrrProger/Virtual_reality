@@ -19,8 +19,10 @@ let stereoCam // Object holding stereo camera calc params.
 let spaceball // a simple rotator object
 let surface
 let shProgram
-let a_coords_loc;          // Location of the a_coords attribute variable in the shader program.
-let a_coords_buffer;       // Buffer to hold the values for a_coords.
+let video
+
+var textureWebCam = gl.createTexture();
+
 // Vertex shader
 var vshader = `
 attribute vec3 vertex;
@@ -165,7 +167,6 @@ function draw() {
   gl.uniform4fv(shProgram.iColor, [1,1,0,1]);
 
   let matrleftfrust = stereoCam.applyLeftFrustum();
-  console.log(matrleftfrust)
   gl.uniformMatrix4fv(shProgram.iModelProjectionMatrix, false, matrleftfrust);
 
   let matAccum1 = m4.multiply(modelview, translatetozero);
@@ -185,7 +186,6 @@ function draw() {
 
   
   let matrightfrustum = stereoCam.applyRightFrustum();
-  console.log(matrightfrustum);
   gl.uniformMatrix4fv(shProgram.iModelProjectionMatrix, false, matrightfrustum);
 
   let translateRightEye = m4.translation(stereoCam.eyeSeperation / 2, 0, 0);
@@ -194,6 +194,22 @@ function draw() {
   gl.uniformMatrix4fv(shProgram.iModelViewMatrix, false, modelViewRight);
   
   surface.Draw();
+
+  /*
+  let webcamImage = new Image();
+  webcamImage.src = canvas.toDataURL();
+  webcamImage.onload = () =>
+  { 
+    // use the new image as a texture
+    let webcamTexture = gl.createTexture();
+    // send to GPU      
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, webcamTexture);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, webcamImage);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  };
+  */
+
 }
 
 function main() {
@@ -203,7 +219,17 @@ function main() {
   }
   spaceball = new SimpleRotator(canvas, draw, 10);
   initGL();
-  draw();
+
+  video = document.createElement('video');
+  document.getElementById('uiContainer').appendChild(video);
+  video.width    = 320;
+  video.height   = 240;
+  video.autoplay = true;
+  video.src = "video_example.mp4"
+  
+//  setInterval(draw, 1/20);
+
+//  draw();
 }
 
 function createSurfaceData()
@@ -249,6 +275,20 @@ function ShaderProgram(name, program) {
   this.Use = function() {
     gl.useProgram(this.prog);
   }
+}
+
+function CreateWebCamTexture() {
+  var textureWebCam = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, textureWebCam);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  //npot textures are only allowed with this add.
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, video);
+
+  gl.activeTexture(gl.TEXTURE0);
+  return textureWebCam;
 }
 
 main();
