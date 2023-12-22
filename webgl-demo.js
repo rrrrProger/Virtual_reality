@@ -298,8 +298,9 @@ function loadImageAndCreateTextureInfo(url) {
 
 var texInfo = loadImageAndCreateTextureInfo('cube.png');
 
-function render() {
+function render(time) {
 
+  time *= 0.001
   webglUtils.resizeCanvasToDisplaySize(gl.canvas);
 
   // Tell WebGL how to convert from clip space to pixels
@@ -320,12 +321,9 @@ function render() {
   gl.enableVertexAttribArray(texcoordLocation);
   gl.vertexAttribPointer(texcoordLocation, 2, gl.FLOAT, false, 0, 0);
 
-  var matrix = [
-    1, 0, 0, 0,
-    0, 1, 0, 0,
-    0, 0, 1, 0,
-    0, 0, 0, 1
-  ]
+  var matrix = m4.scaling(1, 1, 1);
+  matrix = m4.zRotate(matrix, time);
+  matrix = m4.scale(matrix, 0.5, 0.5, 1);
 
   // Set the matrix.
   gl.uniformMatrix4fv(matrixLocation, false, matrix);
@@ -351,7 +349,7 @@ function main() {
 
   
   video = document.createElement('video');
-  document.getElementById('uiContainer').appendChild(video);
+//  document.getElementById('uiContainer').appendChild(video);
   video.width    = 320;
   video.height   = 240;
   video.autoplay = true;
