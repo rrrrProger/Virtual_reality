@@ -27,12 +27,13 @@ var vshader = `
 attribute vec4 a_position;
 attribute vec2 a_texcoord;
 
-uniform mat4 u_matrix;
+uniform mat4 ModelViewMatrix;
+uniform mat4 ModelProjectionMatrix;
 
 varying vec2 v_texcoord;
 
 void main() {
-   gl_Position = u_matrix * a_position;
+   gl_Position = ModelProjectionMatrix * ModelViewMatrix * a_position;
    v_texcoord = a_texcoord;
 }`;
 
@@ -74,7 +75,9 @@ var positionLocation = gl.getAttribLocation(program, "a_position");
 var texcoordLocation = gl.getAttribLocation(program, "a_texcoord");
 
 // lookup uniforms
-var matrixLocation = gl.getUniformLocation(program, "u_matrix");
+
+var matrixLocationView = gl.getUniformLocation(program, "ModelViewMatrix");
+var matrixLocationProjection = gl.getUniformLocation(program, "ModelProjectionMatrix");
 var textureLocation = gl.getUniformLocation(program, "u_texture");
 
 webglLessonsUI.setupUI(document.querySelector('#ui'), settings, [
@@ -185,31 +188,33 @@ function Model(name) {
 
 //    gl.drawArrays(gl.TRIANGLES, 0, 3);
     gl.drawArrays(gl.LINE_STRIP, 0, this.count);
+    console.log("Drawing surface");
   }
 }
 
 function draw() {
+  gl.enable(gl.DEPTH_TEST);
   var modelview = [
     1, 0, 0, 0,
     0, 1, 0, 0,
     0, 0, 1, 0,
     0, 0, 0, 1
   ]
-
-  var projection = [
+//  var projection = m4.perspective(Math.PI / 8, 1, 8, 12);
+  var modelprojection = [
     1, 0, 0, 0,
     0, 1, 0, 0,
     0, 0, 1, 0,
     0, 0, 0, 1
   ]
+
   gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
 
   gl.clear(gl.COLOR_BUFFER_BIT);
-  /*
-  var modelview = spaceball.getViewMatrix();
-  var translatetozero = m4.translation(0.0, 0.0, -1.0);
-  var projection = m4.perspective(Math.PI / 8, 1, 8, 12);
 
+  var translatetozero = m4.translation(0.0, 0.0, -1.0);
+
+  
   stereoCam = new StereoCamera(
     settings.eyeSeperation, //70
     settings.convergence, //5000
@@ -218,7 +223,7 @@ function draw() {
     settings.znear, //1
     settings.zfar // 20000
   );
-  gl.uniform4fv(shProgram.iColor, [1,1,0,1]);
+//  gl.uniform4fv(shProgram.iColor, [1,1,0,1]);
 
   let matrleftfrust = stereoCam.applyLeftFrustum();
   gl.uniformMatrix4fv(shProgram.iModelProjectionMatrix, false, matrleftfrust);
@@ -249,23 +254,9 @@ function draw() {
   
   surface.Draw();
 
-  /*
-  let webcamImage = new Image();
-  webcamImage.src = canvas.toDataURL();
-  webcamImage.onload = () =>
-  { 
-    // use the new image as a texture
-    let webcamTexture = gl.createTexture();
-    // send to GPU      
-    gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, webcamTexture);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, webcamImage);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-  };
-  */
-  //  gl.uniformMatrix4fv(shProgram.iModelViewMatrix, false, modelview);
-  //  gl.uniformMatrix4fv(shProgram.iModelProjectionMatrix, false, projection);
-  // Create a buffer.
+  gl.clearColor(1, 1, 1, 1);   // clear to white
+  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
   var positionBuffer = gl.createBuffer();
   gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
 
@@ -315,17 +306,7 @@ function draw() {
       height: 1,
       texture: tex,
     };
-    /*
-    var img = new Image();
-    img.addEventListener('load', function() {
-      textureInfo.width = img.width;
-      textureInfo.height = img.height;
 
-      gl.bindTexture(gl.TEXTURE_2D, textureInfo.texture);
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
-    });
-    img.src = url;
-  */
     textureInfo.width = video.width;
     textureInfo.height = video.height;
 
@@ -359,12 +340,10 @@ function draw() {
     gl.enableVertexAttribArray(texcoordLocation);
     gl.vertexAttribPointer(texcoordLocation, 2, gl.FLOAT, false, 0, 0);
 
-    var matrix = m4.scaling(1, 1.5, 1);
-    matrix = m4.zRotate(matrix, time);
-    matrix = m4.scale(matrix, 0.5, 0.5, 1);
-
+    var matrix = m4.multiply(translatetozero, modelview);
     // Set the matrix.
-    gl.uniformMatrix4fv(matrixLocation, false, matrix);
+    gl.uniformMatrix4fv(matrixLocationProjection, false, modelprojection);
+    gl.uniformMatrix4fv(matrixLocationView, false, matrix);
 
     // Tell the shader to get the texture from texture unit 0
     gl.uniform1i(textureLocation, 0);
@@ -413,9 +392,9 @@ function initGL() {
   shProgram = new ShaderProgram('Basic', program);
   shProgram.Use();
 
-  shProgram.iAttribVertex = gl.getAttribLocation(program, "vertex");
+  shProgram.iAttribVertex = gl.getAttribLocation(program, "a_position");
   shProgram.iModelViewMatrix = gl.getUniformLocation(program, "ModelViewMatrix");
-  shProgram.iModelProjectionMatrix = gl.getUniformLocation(program, "ModelProjectonMatrix");
+  shProgram.iModelProjectionMatrix = gl.getUniformLocation(program, "ModelProjectionMatrix");
 //  shProgram.iColor = gl.getUniformLocation(program, "color");
   shProgram.itexCoordAttributeLocation = gl.getAttribLocation(program, "aTextureCoord");
   shProgram.iuSampler = gl.getUniformLocation(program, "uSampler");
