@@ -272,8 +272,6 @@ function loadWebCamTexture() {
     // Tell WebGL how to convert from clip space to pixels
     gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
 
-    gl.clear(gl.COLOR_BUFFER_BIT);
-
     gl.bindTexture(gl.TEXTURE_2D, texInfo.texture);
 
     // Tell WebGL to use our shader program pair
@@ -300,17 +298,20 @@ function loadWebCamTexture() {
     if (copyVideo)
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, video);
 
-    requestAnimationFrame(render);
+ //   requestAnimationFrame(render);
   }
-  requestAnimationFrame(render);
+
+  render(1);
+//  requestAnimationFrame(render);
 }
+
 function draw() {
   gl.enable(gl.DEPTH_TEST);
-  
   gl.colorMask(true, true, true, true);
-
   gl.clear(gl.COLOR_BUFFER_BIT);
  
+  loadWebCamTexture();
+
   stereoCam = new StereoCamera(
     settings.eyeSeperation, //70
     settings.convergence, //5000
@@ -322,7 +323,7 @@ function draw() {
   var white1PixelTexture = gl.createTexture();
   gl.bindTexture(gl.TEXTURE_2D, white1PixelTexture);
   gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE,
-                new Uint8Array([255,255,255,255]));
+                new Uint8Array([255, 255, 255, 255]));
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
@@ -339,8 +340,7 @@ function draw() {
   gl.uniform1i(textureLocation, 0);
   gl.uniform4fv(shProgram.iColor, [1,1,0,1]);
   surface.Draw();
-  
-  
+
   gl.clear(gl.DEPTH_BUFFER_BIT);
   gl.clearDepth(1);
   gl.colorMask(false, true, true, true);
@@ -359,8 +359,7 @@ function draw() {
   gl.clearDepth(1);
   gl.colorMask(true, true, true, true);
   gl.uniform4fv(shProgram.iColor, [1,1,1,1]);
-  
-  loadWebCamTexture();
+
 }
 
 function main() {
@@ -373,9 +372,7 @@ function main() {
 
   video = setupVideo("video_example.mp4");
   
-//  setInterval(draw, 1/20);
-
-  draw();
+  setInterval(draw, 1/20);
 }
 
 function createSurfaceData()
