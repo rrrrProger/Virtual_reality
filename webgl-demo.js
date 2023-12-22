@@ -306,7 +306,7 @@ function loadWebCamTexture() {
 }
 function draw() {
   gl.enable(gl.DEPTH_TEST);
-  gl.uniform4fv(shProgram.iColor, [1,1,0,1]);
+  gl.uniform4fv(shProgram.iColor, [0,0,0,1]);
   gl.colorMask(true, true, true, true);
 
   gl.clear(gl.COLOR_BUFFER_BIT);
@@ -347,7 +347,10 @@ function draw() {
   gl.uniform1i(textureLocation, 1);
   surface.Draw();
 
-//  loadWebCamTexture();
+  gl.clear(gl.DEPTH_BUFFER_BIT);
+  gl.clearDepth(1);
+  gl.colorMask(true, true, true, true);
+  loadWebCamTexture();
 }
 
 function main() {
