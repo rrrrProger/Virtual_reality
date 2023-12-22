@@ -24,30 +24,28 @@ let tex
 
 // Vertex shader
 var vshader = `
-attribute vec3 vertex;
-uniform mat4 ModelViewMatrix;
-uniform mat4 ModelProjectonMatrix;
-varying highp vec2 vTextureCoord;
-attribute vec2 aTextureCoord;
+attribute vec4 a_position;
+attribute vec2 a_texcoord;
+
+uniform mat4 u_matrix;
+
+varying vec2 v_texcoord;
+
 void main() {
-    gl_Position = ModelProjectonMatrix * ModelViewMatrix * vec4(vertex, 1.0);
-    vTextureCoord = aTextureCoord;
+   gl_Position = u_matrix * a_position;
+   v_texcoord = a_texcoord;
 }`;
 
 // Fragment shader
 var fshader = `
-#ifdef GL_FRAGMENT_PRECISION_HIGH 
-    precision highp float;
-#else
-    precision mediump float;
-#endif
-varying highp vec2 vTextureCoord;
-    
-uniform sampler2D uSampler;
-uniform vec4 color;
+precision mediump float;
+
+varying vec2 v_texcoord;
+
+uniform sampler2D u_texture;
 
 void main() {
-    gl_FragColor = texture2D(uSampler, vTextureCoord) * color;
+   gl_FragColor = texture2D(u_texture, v_texcoord);
 }`;
 
 // Compile program
@@ -71,20 +69,13 @@ if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
   const info = gl.getProgramInfoLog(program);
   throw `Could not compile WebGL program. \n\n${info}`;
 }
+// look up where the vertex data needs to go.
+var positionLocation = gl.getAttribLocation(program, "a_position");
+var texcoordLocation = gl.getAttribLocation(program, "a_texcoord");
 
-const programInfo = {
-  program: program,
-  attribLocations: {
-    vertexPosition: gl.getAttribLocation(program, "vertex"),
-    textureCoord: gl.getAttribLocation(program, "aTextureCoord"),
-  },
-  uniformLocations: {
-    projectionMatrix: gl.getUniformLocation(program, "ModelProjectonMatrix"),
-    modelViewMatrix: gl.getUniformLocation(program, "ModelViewMatrix"),
-    uSampler: gl.getUniformLocation(program, "uSampler"),
-  },
-};
-
+// lookup uniforms
+var matrixLocation = gl.getUniformLocation(program, "u_matrix");
+var textureLocation = gl.getUniformLocation(program, "u_texture");
 
 webglLessonsUI.setupUI(document.querySelector('#ui'), settings, [
   { type: 'slider',   key: 'fov',        min:   0, max: 360, change: draw, precision: 2, step: 0.001, },
@@ -166,11 +157,6 @@ function Model(name) {
 }
 
 function draw() {
-  gl.clearColor(1,0,0,1);
-  gl.enable(gl.DEPTH_TEST);
-  gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
-  gl.clearDepth(1);
-
   var modelview = [
     1, 0, 0, 0,
     0, 1, 0, 0,
@@ -184,7 +170,9 @@ function draw() {
     0, 0, 1, 0,
     0, 0, 0, 1
   ]
+  gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
 
+  gl.clear(gl.COLOR_BUFFER_BIT);
   /*
   var modelview = spaceball.getViewMatrix();
   var translatetozero = m4.translation(0.0, 0.0, -1.0);
@@ -243,114 +231,114 @@ function draw() {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
   };
   */
-  gl.uniformMatrix4fv(shProgram.iModelViewMatrix, false, modelview);
-  gl.uniformMatrix4fv(shProgram.iModelProjectionMatrix, false, projection);
-  // Create a vertex array object (attribute state)
-  var vao = gl.createVertexArray();
+//  gl.uniformMatrix4fv(shProgram.iModelViewMatrix, false, modelview);
+//  gl.uniformMatrix4fv(shProgram.iModelProjectionMatrix, false, projection);
+// Create a buffer.
+var positionBuffer = gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
 
-  // and make it the one we're currently working with
-  gl.bindVertexArray(vao);
+// Put a 2 unit quad in the buffer
+var positions = [
+  -1, -1,
+  -1,  1,
+   1, -1,
+   1, -1,
+  -1,  1,
+   1,  1,
+];
+gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(positions), gl.STATIC_DRAW);
 
-  // Create a buffer and put a single pixel space rectangle in
-  // it (2 triangles)
-  var positionBuffer = gl.createBuffer();
+// Create a buffer for texture coords
+var texcoordBuffer = gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER, texcoordBuffer);
 
-  gl.enableVertexAttribArray(shProgram.iAttribVertex);
-  gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+// Put texcoords in the buffer
+var texcoords = [
+  0, 0,
+  0, 1,
+  1, 0,
+  1, 0,
+  0, 1,
+  1, 1,
+];
+gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(texcoords), gl.STATIC_DRAW);
 
-  var size = 2;          // 2 components per iteration
-  var type = gl.FLOAT;   // the data is 32bit floats
-  var normalize = false; // don't normalize the data
-  var stride = 0;        // 0 = move forward size * sizeof(type) each iteration to get the next position
-  var offset = 0;        // start at the beginning of the buffer
-  gl.vertexAttribPointer(
-    shProgram.iAttribVertex, size, type, normalize, stride, offset);
+// creates a texture info { width: w, height: h, texture: tex }
+// The texture will start with 1x1 pixels and be updated
+// when the image has loaded
+function loadImageAndCreateTextureInfo(url) {
+  var tex = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, tex);
+  // Fill the texture with a 1x1 blue pixel.
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE,
+                new Uint8Array([0, 0, 255, 255]));
 
-  // provide texture coordinates for the rectangle.
-  var texCoordBuffer = gl.createBuffer();
-  gl.bindBuffer(gl.ARRAY_BUFFER, texCoordBuffer);
-  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
-      0.0,  0.0,
-      1.0,  0.0,
-      0.0,  1.0,
-      0.0,  1.0,
-      1.0,  0.0,
-      1.0,  1.0,
-  ]), gl.STATIC_DRAW);
-
-  // Turn on the attribute
-  gl.enableVertexAttribArray(shProgram.itexCoordAttributeLocation);
-
-  // Tell the attribute how to get data out of texCoordBuffer (ARRAY_BUFFER)
-  var size = 2;          // 2 components per iteration
-  var type = gl.FLOAT;   // the data is 32bit floats
-  var normalize = false; // don't normalize the data
-  var stride = 0;        // 0 = move forward size * sizeof(type) each iteration to get the next position
-  var offset = 0;        // start at the beginning of the buffer
-  gl.vertexAttribPointer(
-    shProgram.itexCoordAttributeLocation, size, type, normalize, stride, offset);
-
-  // Create a texture.
-  tex = gl.createTexture();
+  // let's assume all images are not a power of 2
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
 
   var textureInfo = {
     width: 1,   // we don't know the size until it loads
     height: 1,
     texture: tex,
   };
-
-  gl.bindVertexArray(vao);
-
-  var image = new Image();
-  image.src = "cube.png";
-  image.addEventListener('load', function() {
-    textureInfo.width = image.width;
-    textureInfo.height = image.height;
+  var img = new Image();
+  img.addEventListener('load', function() {
+    textureInfo.width = img.width;
+    textureInfo.height = img.height;
 
     gl.bindTexture(gl.TEXTURE_2D, textureInfo.texture);
-    gl.activeTexture(gl.TEXTURE0 + 0);
-
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-    
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-    /*
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-    */
-    console.log("image : ", image);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
   });
+  img.src = url;
+
+  return textureInfo;
+}
+
+var texInfo = loadImageAndCreateTextureInfo('cube.png');
+
+function render() {
 
   webglUtils.resizeCanvasToDisplaySize(gl.canvas);
 
+  // Tell WebGL how to convert from clip space to pixels
   gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
 
-  gl.clearColor(0, 0, 0, 0);
-  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-  gl.uniform4fv(shProgram.iColor, [1,1,0,1]);
+  gl.clear(gl.COLOR_BUFFER_BIT);
 
+  gl.bindTexture(gl.TEXTURE_2D, texInfo.texture);
 
-  // Pass in the canvas resolution so we can convert from
-  // pixels to clipspace in the shader
+  // Tell WebGL to use our shader program pair
+  gl.useProgram(program);
+
+  // Setup the attributes to pull data from our buffers
+  gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+  gl.enableVertexAttribArray(positionLocation);
+  gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 0, 0);
+  gl.bindBuffer(gl.ARRAY_BUFFER, texcoordBuffer);
+  gl.enableVertexAttribArray(texcoordLocation);
+  gl.vertexAttribPointer(texcoordLocation, 2, gl.FLOAT, false, 0, 0);
+
+  var matrix = [
+    1, 0, 0, 0,
+    0, 1, 0, 0,
+    0, 0, 1, 0,
+    0, 0, 0, 1
+  ]
+
+  // Set the matrix.
+  gl.uniformMatrix4fv(matrixLocation, false, matrix);
 
   // Tell the shader to get the texture from texture unit 0
-  gl.uniform1i(shProgram.iuSampler, 0);
+  gl.uniform1i(textureLocation, 0);
 
-  gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+  // draw the quad (2 triangles, 6 vertices)
+  gl.drawArrays(gl.TRIANGLES, 0, 6);
 
-  console.log("image.width : ", image.width, " image.height : ", image.height)
-  setRectangle(0, 0, image.width, image.height);
-
-  // Draw the rectangle.
-  var primitiveType = gl.TRIANGLES;
-  var offset = 0;
-  var count = 6;
-  gl.drawArrays(primitiveType, offset, count);
+  requestAnimationFrame(render);
+}
+requestAnimationFrame(render);
 }
 
 function main() {
@@ -395,9 +383,11 @@ function initGL() {
   shProgram.iAttribVertex = gl.getAttribLocation(program, "vertex");
   shProgram.iModelViewMatrix = gl.getUniformLocation(program, "ModelViewMatrix");
   shProgram.iModelProjectionMatrix = gl.getUniformLocation(program, "ModelProjectonMatrix");
-  shProgram.iColor = gl.getUniformLocation(program, "color");
+//  shProgram.iColor = gl.getUniformLocation(program, "color");
   shProgram.itexCoordAttributeLocation = gl.getAttribLocation(program, "aTextureCoord");
   shProgram.iuSampler = gl.getUniformLocation(program, "uSampler");
+  shProgram.ivTextureCoord = gl.getUniformLocation(program, "vTextureCoord");
+  // look up where the vertex data needs to go.
 
   // lookup uniforms
 //  shProgram.iresolutionLocation = gl.getUniformLocation(program, "u_resolution");
@@ -424,19 +414,34 @@ function ShaderProgram(name, program) {
   }
 }
 
-function setRectangle(x, y, width, height) {
-  var x1 = x;
-  var x2 = x + width;
-  var y1 = y;
-  var y2 = y + height;
-  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
-     x1, y1,
-     x2, y1,
-     x1, y2,
-     x1, y2,
-     x2, y1,
-     x2, y2,
-  ]), gl.STATIC_DRAW);
+function loadImageAndCreateTextureInfo(url) {
+  var tex = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, tex);
+  // Fill the texture with a 1x1 blue pixel.
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE,
+                new Uint8Array([0, 0, 255, 255]));
+
+  // let's assume all images are not a power of 2
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+
+  var textureInfo = {
+    width: 1,   // we don't know the size until it loads
+    height: 1,
+    texture: tex,
+  };
+  var img = new Image();
+  img.addEventListener('load', function() {
+    textureInfo.width = img.width;
+    textureInfo.height = img.height;
+
+    gl.bindTexture(gl.TEXTURE_2D, textureInfo.texture);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
+  });
+  img.src = url;
+
+  return textureInfo;
 }
 
 
