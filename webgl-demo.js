@@ -47,7 +47,7 @@ uniform sampler2D u_texture;
 uniform vec4 color;
 
 void main() {
-  gl_FragColor = texture2D(u_texture, v_texcoord) + color;
+  gl_FragColor = texture2D(u_texture, v_texcoord) * color;
 }`;
 
 // Compile program
@@ -306,7 +306,7 @@ function loadWebCamTexture() {
 }
 function draw() {
   gl.enable(gl.DEPTH_TEST);
-  gl.uniform4fv(shProgram.iColor, [0,0,0,1]);
+  
   gl.colorMask(true, true, true, true);
 
   gl.clear(gl.COLOR_BUFFER_BIT);
@@ -319,7 +319,13 @@ function draw() {
     settings.znear, //1
     settings.zfar // 20000
   );
-  
+  var white1PixelTexture = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, white1PixelTexture);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE,
+                new Uint8Array([255,255,255,255]));
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
   let matrleftfrust = stereoCam.applyLeftFrustum();
   gl.uniformMatrix4fv(shProgram.iModelProjectionMatrix, false, matrleftfrust);
 
@@ -330,9 +336,11 @@ function draw() {
 
   gl.uniformMatrix4fv(shProgram.iModelViewMatrix, false, modelViewLeft);
   gl.colorMask(true, false, false, true);
-  gl.uniform1i(textureLocation, 1);
+  gl.uniform1i(textureLocation, 0);
+  gl.uniform4fv(shProgram.iColor, [1,1,0,1]);
   surface.Draw();
   
+  /*
   gl.clear(gl.DEPTH_BUFFER_BIT);
   gl.clearDepth(1);
   gl.colorMask(false, true, true, true);
@@ -350,7 +358,9 @@ function draw() {
   gl.clear(gl.DEPTH_BUFFER_BIT);
   gl.clearDepth(1);
   gl.colorMask(true, true, true, true);
-  loadWebCamTexture();
+  gl.uniform4fv(shProgram.iColor, [0,0,0,1]);
+  */
+//  loadWebCamTexture();
 }
 
 function main() {
