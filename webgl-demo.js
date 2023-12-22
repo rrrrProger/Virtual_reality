@@ -340,7 +340,7 @@ function draw() {
   gl.uniform4fv(shProgram.iColor, [1,1,0,1]);
   surface.Draw();
   
-  /*
+  
   gl.clear(gl.DEPTH_BUFFER_BIT);
   gl.clearDepth(1);
   gl.colorMask(false, true, true, true);
@@ -352,15 +352,15 @@ function draw() {
 
   gl.uniformMatrix4fv(shProgram.iModelProjectionMatrix, false, matrightfrustum);
   gl.uniformMatrix4fv(shProgram.iModelViewMatrix, false, modelViewRight);
-  gl.uniform1i(textureLocation, 1);
+  gl.uniform1i(textureLocation, 0);
   surface.Draw();
 
   gl.clear(gl.DEPTH_BUFFER_BIT);
   gl.clearDepth(1);
   gl.colorMask(true, true, true, true);
-  gl.uniform4fv(shProgram.iColor, [0,0,0,1]);
-  */
-//  loadWebCamTexture();
+  gl.uniform4fv(shProgram.iColor, [1,1,1,1]);
+  
+  loadWebCamTexture();
 }
 
 function main() {
