@@ -19,7 +19,7 @@ let stereoCam // Object holding stereo camera calc params.
 let spaceball // a simple rotator object
 let surface
 let shProgram
-let video
+var video
 let tex
 
 // Vertex shader
@@ -86,7 +86,39 @@ webglLessonsUI.setupUI(document.querySelector('#ui'), settings, [
   { type: 'slider',   key: 'convergence',       min:   0.0, max: 10000.0, change: draw, precision: 2, step: 0.001, },
 ]);
 
+var copyVideo = false;
 
+function setupVideo(url) {
+  video = document.createElement("video");
+
+  let playing = false;
+  let timeupdate = false;
+
+  video.playsInline = true;
+  video.muted = true;
+  video.loop = true;
+
+  // Waiting for these 2 events ensures
+  // there is data in the video
+  video.addEventListener('playing', function() {
+      playing = true;
+      checkReady();
+  }, true);
+  video.addEventListener('timeupdate', function() {
+      timeupdate = true;
+      checkReady();
+  }, true);
+  function checkReady() {
+      if (playing && timeupdate) {
+          copyVideo = true;
+      }
+  }
+
+  video.src = url;
+  video.play();
+
+  return video;
+}
 
 function StereoCamera(eyeSeperation, 
     convergence, 
@@ -266,7 +298,7 @@ gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(texcoords), gl.STATIC_DRAW);
 // creates a texture info { width: w, height: h, texture: tex }
 // The texture will start with 1x1 pixels and be updated
 // when the image has loaded
-function loadImageAndCreateTextureInfo(url) {
+function loadImageAndCreateTextureInfo() {
   var tex = gl.createTexture();
   gl.bindTexture(gl.TEXTURE_2D, tex);
   // Fill the texture with a 1x1 blue pixel.
@@ -283,6 +315,7 @@ function loadImageAndCreateTextureInfo(url) {
     height: 1,
     texture: tex,
   };
+  /*
   var img = new Image();
   img.addEventListener('load', function() {
     textureInfo.width = img.width;
@@ -292,11 +325,17 @@ function loadImageAndCreateTextureInfo(url) {
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
   });
   img.src = url;
+*/
+  textureInfo.width = video.width;
+  textureInfo.height = video.height;
+
+  gl.bindTexture(gl.TEXTURE_2D, textureInfo.texture);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, video);
 
   return textureInfo;
 }
 
-var texInfo = loadImageAndCreateTextureInfo('cube.png');
+var texInfo = loadImageAndCreateTextureInfo();
 
 function render(time) {
 
@@ -311,7 +350,6 @@ function render(time) {
   gl.bindTexture(gl.TEXTURE_2D, texInfo.texture);
 
   // Tell WebGL to use our shader program pair
-  gl.useProgram(program);
 
   // Setup the attributes to pull data from our buffers
   gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
@@ -321,7 +359,7 @@ function render(time) {
   gl.enableVertexAttribArray(texcoordLocation);
   gl.vertexAttribPointer(texcoordLocation, 2, gl.FLOAT, false, 0, 0);
 
-  var matrix = m4.scaling(1, 1, 1);
+  var matrix = m4.scaling(1, 1.5, 1);
   matrix = m4.zRotate(matrix, time);
   matrix = m4.scale(matrix, 0.5, 0.5, 1);
 
@@ -334,6 +372,9 @@ function render(time) {
   // draw the quad (2 triangles, 6 vertices)
   gl.drawArrays(gl.TRIANGLES, 0, 6);
 
+  if (copyVideo)
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, video);
+
   requestAnimationFrame(render);
 }
 requestAnimationFrame(render);
@@ -344,16 +385,10 @@ function main() {
   if (!gl) {
     return;
   }
-  spaceball = new SimpleRotator(canvas, draw, 10);
+//  spaceball = new SimpleRotator(canvas, draw, 10);
   initGL();
 
-  
-  video = document.createElement('video');
-//  document.getElementById('uiContainer').appendChild(video);
-  video.width    = 320;
-  video.height   = 240;
-  video.autoplay = true;
-  video.src = "video_example.mp4"
+  video = setupVideo("video_example.mp4");
   
 //  setInterval(draw, 1/20);
 
@@ -411,36 +446,5 @@ function ShaderProgram(name, program) {
     gl.useProgram(this.prog);
   }
 }
-
-function loadImageAndCreateTextureInfo(url) {
-  var tex = gl.createTexture();
-  gl.bindTexture(gl.TEXTURE_2D, tex);
-  // Fill the texture with a 1x1 blue pixel.
-  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE,
-                new Uint8Array([0, 0, 255, 255]));
-
-  // let's assume all images are not a power of 2
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-
-  var textureInfo = {
-    width: 1,   // we don't know the size until it loads
-    height: 1,
-    texture: tex,
-  };
-  var img = new Image();
-  img.addEventListener('load', function() {
-    textureInfo.width = img.width;
-    textureInfo.height = img.height;
-
-    gl.bindTexture(gl.TEXTURE_2D, textureInfo.texture);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
-  });
-  img.src = url;
-
-  return textureInfo;
-}
-
 
 main();
