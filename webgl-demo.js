@@ -1,9 +1,35 @@
 'use strict';
 
 const socket = new WebSocket('ws://Pixel-4.netis:8080/sensor/connect?type=android.sensor.gyroscope');
+var last_timestamp = 0;
 
 socket.addEventListener("message", event => {
-  console.log("Message from server ", event.data)
+  var data = JSON.parse(event.data);
+  var deltaRotationMatrix = new Float32Array(16);
+  var deltaRotationVector = new Float32Array(4);
+  var NS2S = 1.0 / 1000000000.0;
+  var values = data.values;
+  var eps = 0.00000000000001;
+  var axisX = values[0];
+  var axisY = values[1];
+  var axisZ = values[2];
+  var dT = (data.timestamp - last_timestamp) * NS2S;
+
+  var omegaMagnitude = Math.sqrt(axisX * axisX + axisY * axisY + axisZ * axisZ);
+  if (omegaMagnitude > eps) {
+    axisX = axisX / omegaMagnitude;
+    axisY = axisY / omegaMagnitude;
+    axisZ = axisZ / omegaMagnitude;
+    var thetaOverTwo = omegaMagnitude * dT / 2.0
+    var sinThetaOverTwo = Math.sin(thetaOverTwo)
+    var cosThetaOverTwo = Math.cos(thetaOverTwo)
+    deltaRotationVector[0] = sinThetaOverTwo * axisX
+    deltaRotationVector[1] = sinThetaOverTwo * axisY
+    deltaRotationVector[2] = sinThetaOverTwo * axisZ
+    deltaRotationVector[3] = cosThetaOverTwo
+  }
+  last_timestamp = data.timestamp;
+  
 });
 
 function degToRad(d) {
@@ -21,8 +47,8 @@ const settings = {
 
 let canvas = document.querySelector("#webglcanvas");
 let gl = canvas.getContext("webgl2");
-let stereoCam // Object holding stereo camera calc params.
-let spaceball // a simple rotator object
+let stereoCam
+let spaceball
 let surface
 let shProgram
 var video
@@ -248,14 +274,7 @@ function initGL() {
   shProgram.iModelViewMatrix = gl.getUniformLocation(program, "ModelViewMatrix");
   shProgram.iModelProjectionMatrix = gl.getUniformLocation(program, "ModelProjectionMatrix");
   shProgram.iColor = gl.getUniformLocation(program, "color");
-  shProgram.itexCoordAttributeLocation = gl.getAttribLocation(program, "aTextureCoord");
-  shProgram.iuSampler = gl.getUniformLocation(program, "uSampler");
-  shProgram.ivTextureCoord = gl.getUniformLocation(program, "vTextureCoord");
-  // look up where the vertex data needs to go.
 
-  // lookup uniforms
-//  shProgram.iresolutionLocation = gl.getUniformLocation(program, "u_resolution");
-//  shProgram.iuImage = gl.getUniformLocation(program, "u_image");
   surface = new Model("Surface");
   surface.BufferData(createSurfaceData());
 
