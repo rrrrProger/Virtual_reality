@@ -1,0 +1,16 @@
+{
+  "dependencies": {
+    "express": "^4.18.2",
+    "ws": "^8.15.1"
+  },
+  "name": "virtual_reality",
+  "description": "Lab 3 Virtual Reality.\r WebGL is used as main library. \r Work examples:\r First initial position:\r ![image-7.png](images/image-7.png)\r In the right top corner there are parameters that can be changed (FOV, cameraX, cameraY, cameraZ, aspect ratio, znear, zfar, eye_seperation - distance between the eyes, convergence)\r For example let's try to change FOV, ratio and znear and apply left and right frustum\r Let's try to change some params:\r With changed FOV:\r ![image-8.png](images/image-8.png)",
+  "version": "1.0.0",
+  "main": "rotator.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}
