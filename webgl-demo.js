@@ -127,7 +127,7 @@ function setupVideo(url) {
       }
   }
 
-  video.src = url;
+  video.src = url
   video.play();
 
   return video;
@@ -208,12 +208,12 @@ function loadWebCamTexture() {
 
   // Put a 2 unit quad in the buffer
   var positions = [
-    -0.5, -0.5,
+    0.5, 0.5,
     -0.5,  0.5,
     0.5, -0.5,
     -0.5, -0.5,
     -0.5,  0.5,
-    0.5,  0.5,
+    0.5,  -0.5,
   ];
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(positions), gl.STATIC_DRAW);
 
@@ -230,6 +230,23 @@ function loadWebCamTexture() {
     0, 1,
     1, 1,
   ];
+
+  const textureCoordinates = [
+    // Front
+    0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0,
+    // Back
+    0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0,
+    // Top
+    0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0,
+    // Bottom
+    0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0,
+    // Right
+    0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0,
+    // Left
+    0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0,
+  ];
+
+  
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(texcoords), gl.STATIC_DRAW);
 
   // creates a texture info { width: w, height: h, texture: tex }
@@ -257,6 +274,7 @@ function loadWebCamTexture() {
     textureInfo.height = video.height;
 
     gl.bindTexture(gl.TEXTURE_2D, textureInfo.texture);
+    
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, video);
 
     return textureInfo;
@@ -297,12 +315,9 @@ function loadWebCamTexture() {
 
     if (copyVideo)
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, video);
-
- //   requestAnimationFrame(render);
   }
 
   render(1);
-//  requestAnimationFrame(render);
 }
 
 function draw() {
@@ -310,7 +325,6 @@ function draw() {
   gl.colorMask(true, true, true, true);
   gl.clear(gl.COLOR_BUFFER_BIT);
  
-  loadWebCamTexture();
 
   stereoCam = new StereoCamera(
     settings.eyeSeperation, //70
@@ -359,6 +373,7 @@ function draw() {
   gl.clearDepth(1);
   gl.colorMask(true, true, true, true);
   gl.uniform4fv(shProgram.iColor, [1,1,1,1]);
+  loadWebCamTexture();
 
 }
 

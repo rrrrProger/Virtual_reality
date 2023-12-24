@@ -1,4 +1,4 @@
-Lab 1 Virtual Reality.
+Lab 2 Virtual Reality.
 1. WebGL is used as main library. 
 Work examples:
 First initial position:
@@ -8,3 +8,12 @@ For example let's try to change FOV, ratio and znear and apply left and right fr
 Let's try to change some params:
 With changed FOV:
 ![Alt text](image-8.png)
+
+Let's add texture video:
+Function loadWebCamTexture() setups web cam texture. Because of virtual camera (OBS) on the computer attempt of capturing video from camera by navigator.mediaDevices was unsuccessful.
+
+![Alt text](image-9.png)
+
+Was added interval to play video:
+
+
