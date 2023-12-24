@@ -1,5 +1,11 @@
 'use strict';
 
+const socket = new WebSocket('ws://Pixel-4.netis:8080/sensor/connect?type=android.sensor.gyroscope');
+
+socket.addEventListener("message", event => {
+  console.log("Message from server ", event.data)
+});
+
 function degToRad(d) {
   return d * Math.PI / 180;
 }
@@ -160,7 +166,6 @@ function Model(name) {
 
 //    gl.drawArrays(gl.TRIANGLES, 0, 3);
     gl.drawArrays(gl.LINE_STRIP, 0, this.count);
-    console.log("Drawing surface");
   }
 }
 
@@ -218,7 +223,6 @@ function main() {
   }
 //  spaceball = new SimpleRotator(canvas, draw, 10);
   initGL();
-  console.log('Got to main')
   draw();
 }
 
