@@ -24,3 +24,7 @@ Another frames from the video:
 ![image-10.png](images/image-10.png)
 
 ![image-11.png](images/image-11.png)
+
+Gif presenting video in texture:
+
+![lab2_capture.gif](images/lab2_capture.gif)
