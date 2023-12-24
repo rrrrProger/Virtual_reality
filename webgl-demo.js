@@ -22,18 +22,16 @@ socket.addEventListener("message", event => {
   var dT = (data.timestamp - last_timestamp) * NS2S;
 
   var omegaMagnitude = Math.sqrt(axisX * axisX + axisY * axisY + axisZ * axisZ);
-  if (omegaMagnitude > eps) {
-    axisX = axisX / omegaMagnitude;
-    axisY = axisY / omegaMagnitude;
-    axisZ = axisZ / omegaMagnitude;
-    var thetaOverTwo = omegaMagnitude * dT / 2.0
-    var sinThetaOverTwo = Math.sin(thetaOverTwo)
-    var cosThetaOverTwo = Math.cos(thetaOverTwo)
-    deltaRotationVector[0] = sinThetaOverTwo * axisX
-    deltaRotationVector[1] = sinThetaOverTwo * axisY
-    deltaRotationVector[2] = sinThetaOverTwo * axisZ
-    deltaRotationVector[3] = cosThetaOverTwo
-  }
+  axisX = axisX / omegaMagnitude;
+  axisY = axisY / omegaMagnitude;
+  axisZ = axisZ / omegaMagnitude;
+  var thetaOverTwo = omegaMagnitude * dT / 2.0
+  var sinThetaOverTwo = Math.sin(thetaOverTwo)
+  var cosThetaOverTwo = Math.cos(thetaOverTwo)
+  deltaRotationVector[0] = sinThetaOverTwo * axisX
+  deltaRotationVector[1] = sinThetaOverTwo * axisY
+  deltaRotationVector[2] = sinThetaOverTwo * axisZ
+  deltaRotationVector[3] = cosThetaOverTwo
   last_timestamp = data.timestamp;
   getRotationMatrixFromVector(deltaRotationMatrix, deltaRotationVector);
   console.log(deltaRotationMatrix);
