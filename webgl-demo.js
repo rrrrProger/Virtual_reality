@@ -2,6 +2,12 @@
 
 const socket = new WebSocket('ws://Pixel-4.netis:8080/sensor/connect?type=android.sensor.gyroscope');
 var last_timestamp = 0;
+var MatrixRotationModelView = [
+  1, 0, 0, 0,
+  0, 1, 0, 0,
+  0, 0, 1, 0,
+  0, 0, 0, 1
+]
 
 socket.addEventListener("message", event => {
   var data = JSON.parse(event.data);
@@ -29,8 +35,65 @@ socket.addEventListener("message", event => {
     deltaRotationVector[3] = cosThetaOverTwo
   }
   last_timestamp = data.timestamp;
-  
+  getRotationMatrixFromVector(deltaRotationMatrix, deltaRotationVector);
+  console.log(deltaRotationMatrix);
+  MatrixRotationModelView = deltaRotationMatrix;
+  draw();
 });
+
+function getRotationMatrixFromVector(deltaRotationMatrix, deltaRotationVector) {
+  var q0;
+  var q1 = deltaRotationVector[0];
+  var q2 = deltaRotationVector[1];
+  var q3 = deltaRotationVector[2];
+  if (deltaRotationVector.length >= 4) {
+      q0 = deltaRotationVector[3];
+  } else {
+      q0 = 1 - q1 * q1 - q2 * q2 - q3 * q3;
+      if (q0 > 0) {
+        q0 = Math.sqrt(q0);
+      } else {
+        q0 = 0;
+      }
+  }
+  var sq_q1 = 2 * q1 * q1;
+  var sq_q2 = 2 * q2 * q2;
+  var sq_q3 = 2 * q3 * q3;
+  var q1_q2 = 2 * q1 * q2;
+  var q3_q0 = 2 * q3 * q0;
+  var q1_q3 = 2 * q1 * q3;
+  var q2_q0 = 2 * q2 * q0;
+  var q2_q3 = 2 * q2 * q3;
+  var q1_q0 = 2 * q1 * q0;
+  if (deltaRotationMatrix.length == 9) {
+      deltaRotationMatrix[0] = 1 - sq_q2 - sq_q3;
+      deltaRotationMatrix[1] = q1_q2 - q3_q0;
+      deltaRotationMatrix[2] = q1_q3 + q2_q0;
+      deltaRotationMatrix[3] = q1_q2 + q3_q0;
+      deltaRotationMatrix[4] = 1 - sq_q1 - sq_q3;
+      deltaRotationMatrix[5] = q2_q3 - q1_q0;
+      deltaRotationMatrix[6] = q1_q3 - q2_q0;
+      deltaRotationMatrix[7] = q2_q3 + q1_q0;
+      deltaRotationMatrix[8] = 1 - sq_q1 - sq_q2;
+  } else if (deltaRotationMatrix.length == 16) {
+      deltaRotationMatrix[0] = 1 - sq_q2 - sq_q3;
+      deltaRotationMatrix[1] = q1_q2 - q3_q0;
+      deltaRotationMatrix[2] = q1_q3 + q2_q0;
+      deltaRotationMatrix[3] = 0.0;
+      deltaRotationMatrix[4] = q1_q2 + q3_q0;
+      deltaRotationMatrix[5] = 1 - sq_q1 - sq_q3;
+      deltaRotationMatrix[6] = q2_q3 - q1_q0;
+      deltaRotationMatrix[7] = 0.0;
+      deltaRotationMatrix[8] = q1_q3 - q2_q0;
+      deltaRotationMatrix[9] = q2_q3 + q1_q0;
+      deltaRotationMatrix[10] = 1 - sq_q1 - sq_q2;
+      deltaRotationMatrix[11] = 0.0;
+      deltaRotationMatrix[12] = 0;
+      deltaRotationMatrix[13] = 0.0;
+      deltaRotationMatrix[14] = 0.0;
+      deltaRotationMatrix[15] = 1.0;
+  }
+}
 
 function degToRad(d) {
   return d * Math.PI / 180;
@@ -212,7 +275,7 @@ function draw() {
   let matrleftfrust = stereoCam.applyLeftFrustum();
   gl.uniformMatrix4fv(shProgram.iModelProjectionMatrix, false, matrleftfrust);
 
-  let matAccum1 = m4.multiply(modelview, translatetozero);
+  let matAccum1 = m4.multiply(MatrixRotationModelView, translatetozero);
 
   let translateLeftEye = m4.translation(-stereoCam.eyeSeperation/2, 0, 0);
   let modelViewLeft = m4.multiply(matAccum1, translateLeftEye);
