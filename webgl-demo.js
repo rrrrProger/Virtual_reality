@@ -10,44 +10,46 @@ var MatrixRotationModelView = [
   0, 0, 0, 1
 ]
 var degtorad = Math.PI / 180; // Degree-to-Radian conversion
-var accelerometerVector;
-var magnetometerVector;
-var MatrixFromGyroscope = new Float32Array(16);
+var accelerometerVector = new Float32Array(4);
+var magnetometerVector = new Float32Array(4);
+var matrixFromGyroscope = new Float32Array(16);
+var rotationMatrixFromMagnetometerAndAccelerometer = new Float32Array(16);
 
 socket.onmessage = function (e) {
   var data = JSON.parse(e.data);
   var type = data.type;
   var values = data.values;
-
+  var timestamp = data.timestamp;
 
   switch (type) {
     case 'android.sensor.accelerometer':
-      accelerometerVector = getVectorFromAccelerometer(data);
+      accelerometerVector = values
       break;
     case 'android.sensor.magnetic_field':
-      magnetometerVector = getVectorFromMagnetometer(data);
+      magnetometerVector = values;
       break;
     case 'android.sensor.gyroscope':
-      MatrixFromGyroscope = getMatrixDataFromGyroscope(data);
+      matrixFromGyroscope = getMatrixDataFromGyroscope(values, timestamp);
       break;
   }
 
-  console.log('values: ' + values);
-  console.log('type : ', type);
+  if (!accelerometerVector.every(item => item === 0) && !magnetometerVector.every(item => item === 0)) {
+    console.log("go to getRotationMatrixFromMagnetometer");
+    rotationMatrixFromMagnetometerAndAccelerometer = getRotationMatrixFromMagnetometerAndAccelerometer(accelerometerVector, magnetometerVector);
+  }
 };
 
 
-function getMatrixDataFromGyroscope(values) {
+function getMatrixDataFromGyroscope(values, timestamp) {
     var deltaRotationMatrix = new Float32Array(16);
     var deltaRotationVector = new Float32Array(4);
     var NS2S = 1.0 / 1000000000.0;
     var axisX = values[0];
     var axisY = values[1];
     var axisZ = values[2];
-    var dT = (data.timestamp - last_timestamp) * NS2S;
+    var dT = (timestamp - last_timestamp) * NS2S;
     var omegaMagnitude = Math.sqrt(axisX * axisX + axisY * axisY + axisZ * axisZ);
   
-    console.log('data from gyroscope : ', data);
     axisX = axisX / omegaMagnitude;
     axisY = axisY / omegaMagnitude;
     axisZ = axisZ / omegaMagnitude;
@@ -60,7 +62,7 @@ function getMatrixDataFromGyroscope(values) {
     deltaRotationVector[1] = sinThetaOverTwo * axisY
     deltaRotationVector[2] = sinThetaOverTwo * axisZ
     deltaRotationVector[3] = cosThetaOverTwo
-    last_timestamp = data.timestamp;
+    last_timestamp = timestamp;
 
     function getRotationMatrixFromVector(deltaRotationMatrix, deltaRotationVector) {
       var q0;
@@ -122,13 +124,52 @@ function getMatrixDataFromGyroscope(values) {
     return deltaRotationMatrix;
 }
 
-function getVectorFromMagnetometer(event) {
-  var data = JSON.parse(event.data);
-  console.log('data from magnetometer : ', data)
-}
+function getRotationMatrixFromMagnetometerAndAccelerometer(gravity, geomagnetic) {
+// TODO: move this to native code for efficiency
+  var Ax = gravity[0];
+  var Ay = gravity[1];
+  var Az = gravity[2];
+  var normsqA = (Ax * Ax + Ay * Ay + Az * Az);
+  var g = 9.81;
+  var freeFallGravitySquared = 0.01 * g * g;
+  var R = new Float32Array(16);
+  if (normsqA < freeFallGravitySquared) {
+    // gravity less than 10% of normal value
+    return false;
+  }
+  var Ex = geomagnetic[0];
+  var Ey = geomagnetic[1];
+  var Ez = geomagnetic[2];
+  var Hx = Ey * Az - Ez * Ay;
+  var Hy = Ez * Ax - Ex * Az;
+  var Hz = Ex * Ay - Ey * Ax;
+  var normH = Math.sqrt(Hx * Hx + Hy * Hy + Hz * Hz);
+  if (normH < 0.1) {
+    // device is close to free fall (or in space?), or close to
+    // magnetic north pole. Typical values are  > 100.
+    return false;
+  }
+  var invH = 1.0 / normH;
+  Hx *= invH;
+  Hy *= invH;
+  Hz *= invH;
+  var invA = 1.0/ Math.sqrt(Ax * Ax + Ay * Ay + Az * Az);
+  Ax *= invA;
+  Ay *= invA;
+  Az *= invA;
+  var Mx = Ay * Hz - Az * Hy;
+  var My = Az * Hx - Ax * Hz;
+  var Mz = Ax * Hy - Ay * Hx;
 
-function getVectorFromAccelerometer(data) {
-  console.log('data from accelerometer : ', data);
+  R[0]  = Hx;    R[1]  = Hy;    R[2]  = Hz;   R[3]  = 0;
+  R[4]  = Mx;    R[5]  = My;    R[6]  = Mz;   R[7]  = 0;
+  R[8]  = Ax;    R[9]  = Ay;    R[10] = Az;   R[11] = 0;
+  R[12] = 0;     R[13] = 0;     R[14] = 0;    R[15] = 1;
+
+  gravity.fill(0);
+  geomagnetic.fill(0);
+
+  return R;
 }
 
 function degToRad(d) {
