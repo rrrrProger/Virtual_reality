@@ -1,7 +1,7 @@
 'use strict';
 
 const socket_accelerometer = new WebSocket('ws://Pixel-4.netis:8080/sensor/connect?type=android.sensor.accelerometer');
-const socket_magnetometer  = new WebSocket('ws://Pixel-4.netis:8080/sensor/connect?type=android.sensor.magnetometer');
+const socket_magnetometer  = new WebSocket('ws://Pixel-4.netis:8080/sensor/connect?type=android.sensor.magnetic_field');
 const socket_gyroscope     = new WebSocket('ws://Pixel-4.netis:8080/sensor/connect?type=android.sensor.gyroscope');
 
 var last_timestamp = 0;
@@ -19,6 +19,14 @@ socket_gyroscope.addEventListener("message", event => {
   matrixFromGyroscope = getMatrixDataFromGyroscope(event);
 });
 
+socket_magnetometer.addEventListener("message", event => {
+  var vectorFromMagnetometer = getVectorFromMagnetometer(event);
+})
+
+socket_accelerometer.addEventListener("message", event => {
+  var vectorFromAccelerometer = getVectorFromAccelerometer(event);
+})
+
 function getMatrixDataFromGyroscope(event) {
     var data = JSON.parse(event.data);
     var deltaRotationMatrix = new Float32Array(16);
@@ -31,6 +39,7 @@ function getMatrixDataFromGyroscope(event) {
     var dT = (data.timestamp - last_timestamp) * NS2S;
     var omegaMagnitude = Math.sqrt(axisX * axisX + axisY * axisY + axisZ * axisZ);
   
+    console.log('data from gyroscope : ', data);
     axisX = axisX / omegaMagnitude;
     axisY = axisY / omegaMagnitude;
     axisZ = axisZ / omegaMagnitude;
@@ -103,6 +112,16 @@ function getMatrixDataFromGyroscope(event) {
     getRotationMatrixFromVector(deltaRotationMatrix, deltaRotationVector);
     
     return deltaRotationMatrix;
+}
+
+function getVectorFromMagnetometer(event) {
+  var data = JSON.parse(event.data);
+  console.log('data from magnetometer : ', data)
+}
+
+function getVectorFromAccelerometer(event) {
+  var data = JSON.parse(event.data);
+  console.log('data from accelerometer : ', event.data);
 }
 
 function degToRad(d) {
