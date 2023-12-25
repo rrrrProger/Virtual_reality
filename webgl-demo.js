@@ -1,8 +1,6 @@
 'use strict';
 
-const socket_accelerometer = new WebSocket('ws://Pixel-4.netis:8080/sensor/connect?type=android.sensor.accelerometer');
-const socket_magnetometer  = new WebSocket('ws://Pixel-4.netis:8080/sensor/connect?type=android.sensor.magnetic_field');
-const socket_gyroscope     = new WebSocket('ws://Pixel-4.netis:8080/sensor/connect?type=android.sensor.gyroscope');
+const socket = new WebSocket('ws://Pixel-4.netis:8080/sensors/connect?types=["android.sensor.accelerometer", "android.sensor.magnetic_field", "android.sensor.gyroscope"]')
 
 var last_timestamp = 0;
 var MatrixRotationModelView = [
@@ -12,27 +10,37 @@ var MatrixRotationModelView = [
   0, 0, 0, 1
 ]
 var degtorad = Math.PI / 180; // Degree-to-Radian conversion
+var accelerometerVector;
+var magnetometerVector;
+var MatrixFromGyroscope = new Float32Array(16);
 
-socket_gyroscope.addEventListener("message", event => {
-  var matrixFromGyroscope;
+socket.onmessage = function (e) {
+  var data = JSON.parse(e.data);
+  var type = data.type;
+  var values = data.values;
 
-  matrixFromGyroscope = getMatrixDataFromGyroscope(event);
-});
 
-socket_magnetometer.addEventListener("message", event => {
-  var vectorFromMagnetometer = getVectorFromMagnetometer(event);
-})
+  switch (type) {
+    case 'android.sensor.accelerometer':
+      accelerometerVector = getVectorFromAccelerometer(data);
+      break;
+    case 'android.sensor.magnetic_field':
+      magnetometerVector = getVectorFromMagnetometer(data);
+      break;
+    case 'android.sensor.gyroscope':
+      MatrixFromGyroscope = getMatrixDataFromGyroscope(data);
+      break;
+  }
 
-socket_accelerometer.addEventListener("message", event => {
-  var vectorFromAccelerometer = getVectorFromAccelerometer(event);
-})
+  console.log('values: ' + values);
+  console.log('type : ', type);
+};
 
-function getMatrixDataFromGyroscope(event) {
-    var data = JSON.parse(event.data);
+
+function getMatrixDataFromGyroscope(values) {
     var deltaRotationMatrix = new Float32Array(16);
     var deltaRotationVector = new Float32Array(4);
     var NS2S = 1.0 / 1000000000.0;
-    var values = data.values;
     var axisX = values[0];
     var axisY = values[1];
     var axisZ = values[2];
@@ -119,9 +127,8 @@ function getVectorFromMagnetometer(event) {
   console.log('data from magnetometer : ', data)
 }
 
-function getVectorFromAccelerometer(event) {
-  var data = JSON.parse(event.data);
-  console.log('data from accelerometer : ', event.data);
+function getVectorFromAccelerometer(data) {
+  console.log('data from accelerometer : ', data);
 }
 
 function degToRad(d) {
