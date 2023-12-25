@@ -1,6 +1,6 @@
 'use strict';
 
-const socket = new WebSocket('ws://Pixel-4.netis:8080/sensor/connect?type=android.sensor.gyroscope');
+const socket = new WebSocket('ws://Pixel-4.netis:8080/sensor/connect?type=android.sensor.accelerometer');
 var last_timestamp = 0;
 var MatrixRotationModelView = [
   1, 0, 0, 0,
@@ -8,90 +8,51 @@ var MatrixRotationModelView = [
   0, 0, 1, 0,
   0, 0, 0, 1
 ]
+var degtorad = Math.PI / 180; // Degree-to-Radian conversion
 
 socket.addEventListener("message", event => {
   var data = JSON.parse(event.data);
-  var deltaRotationMatrix = new Float32Array(16);
-  var deltaRotationVector = new Float32Array(4);
-  var NS2S = 1.0 / 1000000000.0;
   var values = data.values;
-  var eps = 0.00000000000001;
-  var axisX = values[0];
-  var axisY = values[1];
-  var axisZ = values[2];
-  var dT = (data.timestamp - last_timestamp) * NS2S;
+  var alpha = values[0];
+  var beta =  values[1];
+  var gamma = values[2];
 
-  var omegaMagnitude = Math.sqrt(axisX * axisX + axisY * axisY + axisZ * axisZ);
-  axisX = axisX / omegaMagnitude;
-  axisY = axisY / omegaMagnitude;
-  axisZ = axisZ / omegaMagnitude;
-  var thetaOverTwo = omegaMagnitude * dT / 2.0
-  var sinThetaOverTwo = Math.sin(thetaOverTwo)
-  var cosThetaOverTwo = Math.cos(thetaOverTwo)
-  deltaRotationVector[0] = sinThetaOverTwo * axisX
-  deltaRotationVector[1] = sinThetaOverTwo * axisY
-  deltaRotationVector[2] = sinThetaOverTwo * axisZ
-  deltaRotationVector[3] = cosThetaOverTwo
-  last_timestamp = data.timestamp;
-  getRotationMatrixFromVector(deltaRotationMatrix, deltaRotationVector);
-  console.log(deltaRotationMatrix);
-  MatrixRotationModelView = deltaRotationMatrix;
+  MatrixRotationModelView = getRotationMatrix(alpha, beta, gamma);
   draw();
 });
 
-function getRotationMatrixFromVector(deltaRotationMatrix, deltaRotationVector) {
-  var q0;
-  var q1 = deltaRotationVector[0];
-  var q2 = deltaRotationVector[1];
-  var q3 = deltaRotationVector[2];
-  if (deltaRotationVector.length >= 4) {
-      q0 = deltaRotationVector[3];
-  } else {
-      q0 = 1 - q1 * q1 - q2 * q2 - q3 * q3;
-      if (q0 > 0) {
-        q0 = Math.sqrt(q0);
-      } else {
-        q0 = 0;
-      }
-  }
-  var sq_q1 = 2 * q1 * q1;
-  var sq_q2 = 2 * q2 * q2;
-  var sq_q3 = 2 * q3 * q3;
-  var q1_q2 = 2 * q1 * q2;
-  var q3_q0 = 2 * q3 * q0;
-  var q1_q3 = 2 * q1 * q3;
-  var q2_q0 = 2 * q2 * q0;
-  var q2_q3 = 2 * q2 * q3;
-  var q1_q0 = 2 * q1 * q0;
-  if (deltaRotationMatrix.length == 9) {
-      deltaRotationMatrix[0] = 1 - sq_q2 - sq_q3;
-      deltaRotationMatrix[1] = q1_q2 - q3_q0;
-      deltaRotationMatrix[2] = q1_q3 + q2_q0;
-      deltaRotationMatrix[3] = q1_q2 + q3_q0;
-      deltaRotationMatrix[4] = 1 - sq_q1 - sq_q3;
-      deltaRotationMatrix[5] = q2_q3 - q1_q0;
-      deltaRotationMatrix[6] = q1_q3 - q2_q0;
-      deltaRotationMatrix[7] = q2_q3 + q1_q0;
-      deltaRotationMatrix[8] = 1 - sq_q1 - sq_q2;
-  } else if (deltaRotationMatrix.length == 16) {
-      deltaRotationMatrix[0] = 1 - sq_q2 - sq_q3;
-      deltaRotationMatrix[1] = q1_q2 - q3_q0;
-      deltaRotationMatrix[2] = q1_q3 + q2_q0;
-      deltaRotationMatrix[3] = 0.0;
-      deltaRotationMatrix[4] = q1_q2 + q3_q0;
-      deltaRotationMatrix[5] = 1 - sq_q1 - sq_q3;
-      deltaRotationMatrix[6] = q2_q3 - q1_q0;
-      deltaRotationMatrix[7] = 0.0;
-      deltaRotationMatrix[8] = q1_q3 - q2_q0;
-      deltaRotationMatrix[9] = q2_q3 + q1_q0;
-      deltaRotationMatrix[10] = 1 - sq_q1 - sq_q2;
-      deltaRotationMatrix[11] = 0.0;
-      deltaRotationMatrix[12] = 0;
-      deltaRotationMatrix[13] = 0.0;
-      deltaRotationMatrix[14] = 0.0;
-      deltaRotationMatrix[15] = 1.0;
-  }
-}
+function getRotationMatrix(alpha, beta, gamma) {
+
+  var _x = beta  ? beta  * degtorad : 0; // beta value
+  var _y = gamma ? gamma * degtorad : 0; // gamma value
+  var _z = alpha ? alpha * degtorad : 0; // alpha value
+
+  var cX = Math.cos(_x);
+  var cY = Math.cos(_y);
+  var cZ = Math.cos(_z);
+  var sX = Math.sin(_x);
+  var sY = Math.sin(_y);
+  var sZ = Math.sin(_z);
+
+  var m11 = cZ * cY - sZ * sX * sY;
+  var m12 = - cX * sZ;
+  var m13 = cY * sZ * sX + cZ * sY;
+
+  var m21 = cY * sZ + cZ * sX * sY;
+  var m22 = cZ * cX;
+  var m23 = sZ * sY - cZ * cY * sX;
+
+  var m31 = - cX * sY;
+  var m32 = sX;
+  var m33 = cX * cY;
+
+  return [
+    m11,  m12,  m13,   0,
+    m21,  m22,  m23,   0,
+    m31,  m32,  m33,   0,
+      0,    0,    0,   1
+  ];
+};
 
 function degToRad(d) {
   return d * Math.PI / 180;
