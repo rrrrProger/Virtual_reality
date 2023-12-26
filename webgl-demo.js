@@ -34,11 +34,23 @@ socket.onmessage = function (e) {
   }
 
   if (!accelerometerVector.every(item => item === 0) && !magnetometerVector.every(item => item === 0)) {
-    console.log("go to getRotationMatrixFromMagnetometer");
     rotationMatrixFromMagnetometerAndAccelerometer = getRotationMatrixFromMagnetometerAndAccelerometer(accelerometerVector, magnetometerVector);
   }
+  if (!matrixFromGyroscope.every(item => item === 0)) {
+    MatrixRotationModelView = constructModelViewMatrix(rotationMatrixFromMagnetometerAndAccelerometer, matrixFromGyroscope);
+  }
+  draw();
 };
 
+function constructModelViewMatrix(rotationMatrixFromMagnetometerAndAccelerometer, matrixFromGyroscope) {
+  var weightGyroscope = 1;
+  var weightMagnetometerAndAccelerometer = 1;
+  var resultModelView = new Float32Array(16);
+
+  resultModelView.forEach((element, index) => resultModelView[index] = weightGyroscope * matrixFromGyroscope[index] + weightMagnetometerAndAccelerometer * rotationMatrixFromMagnetometerAndAccelerometer[index]);
+
+  return resultModelView;
+}
 
 function getMatrixDataFromGyroscope(values, timestamp) {
     var deltaRotationMatrix = new Float32Array(16);
