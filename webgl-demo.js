@@ -43,8 +43,8 @@ socket.onmessage = function (e) {
 };
 
 function constructModelViewMatrix(rotationMatrixFromMagnetometerAndAccelerometer, matrixFromGyroscope) {
-  var weightGyroscope = 1;
-  var weightMagnetometerAndAccelerometer = 1;
+  var weightGyroscope = 0.5;
+  var weightMagnetometerAndAccelerometer = 0.5;
   var resultModelView = new Float32Array(16);
 
   resultModelView.forEach((element, index) => resultModelView[index] = weightGyroscope * matrixFromGyroscope[index] + weightMagnetometerAndAccelerometer * rotationMatrixFromMagnetometerAndAccelerometer[index]);
