@@ -1,4 +1,5 @@
-Lab 2 Virtual Reality.
+# Lab 2 Virtual Reality
+
 WebGL is used as main library. 
 Work examples:
 First initial position:
