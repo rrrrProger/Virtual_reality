@@ -1,4 +1,5 @@
-Lab 3 Virtual Reality.
+# Lab 3 Virtual Reality
+
 Orienting in space using gyroscope (Variant 3)
 
 Installed Server Start app on the phone:
