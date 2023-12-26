@@ -1,5 +1,9 @@
-Lab 1 Virtual Reality.
-1. WebGL is used as main library. 
+# Lab 1 Virtual Reality.
+
+WebGL is used as main library.
+
+Added surface drawing and rotating by mouse using spaceball matrix.
+
 Work examples:
 First initial position:
 ![Alt text](images/image-7.png)
