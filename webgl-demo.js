@@ -1,16 +1,15 @@
 'use strict';
 
-let gl;                         // The webgl context.
-let surface;                    // A surface model
-let shProgram;                  // A shader program
-let spaceball;                  // A SimpleRotator object that lets the user rotate the view by mouse.
+//x(t)=Rcost,y(t)=Rsin(t),z(t)=at
+
+let gl;
+let surface;
+let shProgram;
+let spaceball;
 let texture;
 let cameraText;
 let video;
 let BG;
-let orientHandler = null;
-
-let orientationEvent = { alpha: 0, beta: 0, gamma: 0 };
 
 let sphere = null;
 let pos = 0;
@@ -20,14 +19,16 @@ let ctx = null;
 let panner = null;
 let filter = null;
 let source = null;
+let rSurface = 1;
+let aSurface = 1;
 
 const settings = {
-  fov: 160,
+  fov: 110,
   znear: 1,
   zfar: 2000,
   aspect: 1.0,
-  eyeSeperation: 74.0,
-  convergence: 105.0,
+  eyeSeperation: 94.0,
+  convergence: 200.0,
 };
 
 webglLessonsUI.setupUI(document.querySelector('#ui'), settings, [
@@ -35,23 +36,57 @@ webglLessonsUI.setupUI(document.querySelector('#ui'), settings, [
   { type: 'slider',   key: 'aspect',     min:   0.1, max: 10.0, change: draw, precision: 2, step: 0.001, },
   { type: 'slider',   key: 'znear',      min:   1.0, max: 1000.0, change: draw, precision: 2, step: 0.001, },
   { type: 'slider',   key: 'zfar',       min:   1.0, max: 2000.0, change: draw, precision: 2, step: 0.001, },
-  { type: 'slider',   key: 'eyeSeperation',    min:   0.01, max: 100.0, change: draw, precision: 2, step: 0.001, },
+  { type: 'slider',   key: 'eyeSeperation',    min:   0.01, max: 499.0, change: draw, precision: 2, step: 0.001, },
   { type: 'slider',   key: 'convergence',       min:   0.0, max: 10000.0, change: draw, precision: 2, step: 0.001, },
 ]);
-
-// FIGURE CONSTANTS
-const a = 0.7;
-const c = 1;
-const U_MAX = 360;
-const T_MAX = 90;
-const teta = degToRad(30);
 
 function degToRad(d) {
   return d * Math.PI / 180;
 }
 
+function StereoCamera(eyeSeperation, convergence, 
+                      fov, aspect, znear, zfar) 
+{
+  this.eyeSeperation = eyeSeperation;
+  this.convergence = convergence;
+  this.znear = znear;
+  this.zfar = zfar;
+  this.fov = fov;
+  this.aspect = aspect;
 
-// Constructor
+  this.applyLeftFrustum = function()
+  {
+    let top, bottom, left, right;
+    top = this.znear * Math.tan(degToRad(this.fov/2));
+    bottom = -top;
+
+    let a = this.aspect * Math.tan(degToRad(this.fov / 2)) * this.convergence;
+    let b = a - this.eyeSeperation / 2;
+    let c = a + this.eyeSeperation / 2;
+
+    left = -b * this.znear / this.convergence;
+    right = c * this.znear / this.convergence;
+
+    return m4.frustum(left, right, bottom, top, this.znear, this.zfar);
+  }
+
+  this.applyRightFrustum = function()
+  {
+    const top = Math.tan(degToRad(this.fov)* 0.5) * this.znear;
+    const bottom = -top;
+
+    var a = this.aspect * Math.tan(degToRad(this.fov)/2) * this.convergence;
+
+    var b = a - this.eyeSeperation/2;
+    var c = a + this.eyeSeperation/2;
+
+    const left = -c * this.znear / this.convergence;
+    const right = b * this.znear / this.convergence;
+
+    return m4.frustum(left, right, bottom, top, this.znear, this.zfar);
+  }
+}
+
 function Model(name) {
     this.name = name;
     this.iVertexBuffer = gl.createBuffer();
@@ -88,7 +123,6 @@ function Model(name) {
       gl.drawArrays(gl.LINE_STRIP, 0, this.count);
     }
 }
-
 
 // Constructor
 function ShaderProgram(name, program) {
@@ -176,37 +210,17 @@ const CreateSurfaceData = () => {
   let textureList = [];
   let vertexList = [];
 
-  let calculateTu = (u, t) => [u / U_MAX, (t + 90) / T_MAX + 90];
-  const scale = 1;
-
-  for (let t = -90; t <= T_MAX; t += 1) {
-      for (let u = 0; u <= U_MAX; u += 1) {
-      const uRad = degToRad(u);
-      const tRad = degToRad(t);
-
-      const x = (a + tRad * Math.cos(teta) + c * (tRad * tRad) * Math.sin(teta)) * Math.cos(uRad);
-      const y = (a + tRad * Math.cos(teta) + c * (tRad * tRad) * Math.sin(teta)) * Math.sin(uRad);
-      const z = -tRad * Math.sin(teta) + c * (tRad * tRad) * Math.cos(teta); 
-
-      vertexList.push(x * scale, y * scale, z * scale);
-      textureList.push(...calculateTu(u, t));
-
-      const uNext = degToRad(u + 1);
-      const tNext = degToRad(t + 1);
-
-      const xNext = (a + tNext * Math.cos(teta) + c * (tNext * tNext) * Math.sin(teta)) * Math.cos(uNext);
-      const yNext = (a + tNext * Math.cos(teta) + c * (tNext * tNext) * Math.sin(teta)) * Math.sin(uNext);
-      const zNext = -tNext * Math.sin(teta) + c * (tNext * tNext) * Math.cos(teta); 
-
-      vertexList.push(xNext * scale, yNext * scale, zNext * scale);
-      textureList.push(...calculateTu(u + 1, t + 1));
-      
-    }
+  for (let i = 0; i < 90; i++) {
+    vertexList.push( rSurface * Math.cos(i) * settings.aspect, rSurface * Math.sin(i) * settings.aspect, aSurface * i * settings.aspect);
+    textureList.push( rSurface * Math.cos(i) * settings.aspect, rSurface * Math.sin(i) * settings.aspect, aSurface * i * settings.aspect);
   }
-
+  
   return { vertexList, textureList };
 }
 
+/*
+ * Create spere data for audio 
+*/
 const CreateSphereData = (segmentsI, segmentsJ) => {
   let vertexList = [];
   let textureList = [];
@@ -343,6 +357,8 @@ function init() {
       filter.type = "highpass";
       filter.frequency.value = 1500;
       ctx.resume();
+    } else {
+      console.log("Audio error");
     }
   });
 
