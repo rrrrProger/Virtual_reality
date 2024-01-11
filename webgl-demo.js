@@ -1,274 +1,34 @@
 'use strict';
 
-const socket = new WebSocket('ws://Pixel-4.netis:8080/sensors/connect?types=["android.sensor.accelerometer", "android.sensor.magnetic_field", "android.sensor.gyroscope"]')
+let gl;                         // The webgl context.
+let surface;                    // A surface model
+let shProgram;                  // A shader program
+let spaceball;                  // A SimpleRotator object that lets the user rotate the view by mouse.
+let texture;
+let cameraText;
+let video;
+let BG;
+let orientHandler = null;
 
-var last_timestamp = 0;
-var MatrixRotationModelView = [
-  1, 0, 0, 0,
-  0, 1, 0, 0,
-  0, 0, 1, 0,
-  0, 0, 0, 1
-]
-var degtorad = Math.PI / 180; // Degree-to-Radian conversion
-var accelerometerVector = new Float32Array(4);
-var magnetometerVector = new Float32Array(4);
-var matrixFromGyroscope = new Float32Array(16);
-var rotationMatrixFromMagnetometerAndAccelerometer = new Float32Array(16);
+let orientationEvent = { alpha: 0, beta: 0, gamma: 0 };
 
-socket.onmessage = function (e) {
-  var data = JSON.parse(e.data);
-  var type = data.type;
-  var values = data.values;
-  var timestamp = data.timestamp;
+let sphere = null;
+let pos = 0;
+let spherePosition = [0, 0, 0];
 
-  switch (type) {
-    case 'android.sensor.accelerometer':
-      accelerometerVector = values
-      break;
-    case 'android.sensor.magnetic_field':
-      magnetometerVector = values;
-      break;
-    case 'android.sensor.gyroscope':
-      matrixFromGyroscope = getMatrixDataFromGyroscope(values, timestamp);
-      break;
-  }
-
-  if (!accelerometerVector.every(item => item === 0) && !magnetometerVector.every(item => item === 0)) {
-    rotationMatrixFromMagnetometerAndAccelerometer = getRotationMatrixFromMagnetometerAndAccelerometer(accelerometerVector, magnetometerVector);
-  }
-  if (!matrixFromGyroscope.every(item => item === 0)) {
-    MatrixRotationModelView = constructModelViewMatrix(rotationMatrixFromMagnetometerAndAccelerometer, matrixFromGyroscope);
-  }
-  draw();
-};
-
-function constructModelViewMatrix(rotationMatrixFromMagnetometerAndAccelerometer, matrixFromGyroscope) {
-  var weightGyroscope = 0.5;
-  var weightMagnetometerAndAccelerometer = 0.5;
-  var resultModelView = new Float32Array(16);
-
-  resultModelView.forEach((element, index) => resultModelView[index] = weightGyroscope * matrixFromGyroscope[index] + weightMagnetometerAndAccelerometer * rotationMatrixFromMagnetometerAndAccelerometer[index]);
-
-  return resultModelView;
-}
-
-function getMatrixDataFromGyroscope(values, timestamp) {
-    var deltaRotationMatrix = new Float32Array(16);
-    var deltaRotationVector = new Float32Array(4);
-    var NS2S = 1.0 / 1000000000.0;
-    var axisX = values[0];
-    var axisY = values[1];
-    var axisZ = values[2];
-    var dT = (timestamp - last_timestamp) * NS2S;
-    var omegaMagnitude = Math.sqrt(axisX * axisX + axisY * axisY + axisZ * axisZ);
-  
-    axisX = axisX / omegaMagnitude;
-    axisY = axisY / omegaMagnitude;
-    axisZ = axisZ / omegaMagnitude;
-
-    var thetaOverTwo = omegaMagnitude * dT / 2.0
-    var sinThetaOverTwo = Math.sin(thetaOverTwo)
-    var cosThetaOverTwo = Math.cos(thetaOverTwo)
-
-    deltaRotationVector[0] = sinThetaOverTwo * axisX
-    deltaRotationVector[1] = sinThetaOverTwo * axisY
-    deltaRotationVector[2] = sinThetaOverTwo * axisZ
-    deltaRotationVector[3] = cosThetaOverTwo
-    last_timestamp = timestamp;
-
-    function getRotationMatrixFromVector(deltaRotationMatrix, deltaRotationVector) {
-      var q0;
-      var q1 = deltaRotationVector[0];
-      var q2 = deltaRotationVector[1];
-      var q3 = deltaRotationVector[2];
-      if (deltaRotationVector.length >= 4) {
-          q0 = deltaRotationVector[3];
-      } else {
-          q0 = 1 - q1 * q1 - q2 * q2 - q3 * q3;
-          if (q0 > 0) {
-            q0 = Math.sqrt(q0);
-          } else {
-            q0 = 0;
-          }
-      }
-
-      var sq_q1 = 2 * q1 * q1;
-      var sq_q2 = 2 * q2 * q2;
-      var sq_q3 = 2 * q3 * q3;
-      var q1_q2 = 2 * q1 * q2;
-      var q3_q0 = 2 * q3 * q0;
-      var q1_q3 = 2 * q1 * q3;
-      var q2_q0 = 2 * q2 * q0;
-      var q2_q3 = 2 * q2 * q3;
-      var q1_q0 = 2 * q1 * q0;
-      if (deltaRotationMatrix.length == 9) {
-          deltaRotationMatrix[0] = 1 - sq_q2 - sq_q3;
-          deltaRotationMatrix[1] = q1_q2 - q3_q0;
-          deltaRotationMatrix[2] = q1_q3 + q2_q0;
-          deltaRotationMatrix[3] = q1_q2 + q3_q0;
-          deltaRotationMatrix[4] = 1 - sq_q1 - sq_q3;
-          deltaRotationMatrix[5] = q2_q3 - q1_q0;
-          deltaRotationMatrix[6] = q1_q3 - q2_q0;
-          deltaRotationMatrix[7] = q2_q3 + q1_q0;
-          deltaRotationMatrix[8] = 1 - sq_q1 - sq_q2;
-      } else if (deltaRotationMatrix.length == 16) {
-          deltaRotationMatrix[0] = 1 - sq_q2 - sq_q3;
-          deltaRotationMatrix[1] = q1_q2 - q3_q0;
-          deltaRotationMatrix[2] = q1_q3 + q2_q0;
-          deltaRotationMatrix[3] = 0.0;
-          deltaRotationMatrix[4] = q1_q2 + q3_q0;
-          deltaRotationMatrix[5] = 1 - sq_q1 - sq_q3;
-          deltaRotationMatrix[6] = q2_q3 - q1_q0;
-          deltaRotationMatrix[7] = 0.0;
-          deltaRotationMatrix[8] = q1_q3 - q2_q0;
-          deltaRotationMatrix[9] = q2_q3 + q1_q0;
-          deltaRotationMatrix[10] = 1 - sq_q1 - sq_q2;
-          deltaRotationMatrix[11] = 0.0;
-          deltaRotationMatrix[12] = 0;
-          deltaRotationMatrix[13] = 0.0;
-          deltaRotationMatrix[14] = 0.0;
-          deltaRotationMatrix[15] = 1.0;
-      }
-    }
-    
-    getRotationMatrixFromVector(deltaRotationMatrix, deltaRotationVector);
-    
-    return deltaRotationMatrix;
-}
-
-function getRotationMatrixFromMagnetometerAndAccelerometer(gravity, geomagnetic) {
-// TODO: move this to native code for efficiency
-  var Ax = gravity[0];
-  var Ay = gravity[1];
-  var Az = gravity[2];
-  var normsqA = (Ax * Ax + Ay * Ay + Az * Az);
-  var g = 9.81;
-  var freeFallGravitySquared = 0.01 * g * g;
-  var R = new Float32Array(16);
-  if (normsqA < freeFallGravitySquared) {
-    // gravity less than 10% of normal value
-    return false;
-  }
-  var Ex = geomagnetic[0];
-  var Ey = geomagnetic[1];
-  var Ez = geomagnetic[2];
-  var Hx = Ey * Az - Ez * Ay;
-  var Hy = Ez * Ax - Ex * Az;
-  var Hz = Ex * Ay - Ey * Ax;
-  var normH = Math.sqrt(Hx * Hx + Hy * Hy + Hz * Hz);
-  if (normH < 0.1) {
-    // device is close to free fall (or in space?), or close to
-    // magnetic north pole. Typical values are  > 100.
-    return false;
-  }
-  var invH = 1.0 / normH;
-  Hx *= invH;
-  Hy *= invH;
-  Hz *= invH;
-  var invA = 1.0/ Math.sqrt(Ax * Ax + Ay * Ay + Az * Az);
-  Ax *= invA;
-  Ay *= invA;
-  Az *= invA;
-  var Mx = Ay * Hz - Az * Hy;
-  var My = Az * Hx - Ax * Hz;
-  var Mz = Ax * Hy - Ay * Hx;
-
-  R[0]  = Hx;    R[1]  = Hy;    R[2]  = Hz;   R[3]  = 0;
-  R[4]  = Mx;    R[5]  = My;    R[6]  = Mz;   R[7]  = 0;
-  R[8]  = Ax;    R[9]  = Ay;    R[10] = Az;   R[11] = 0;
-  R[12] = 0;     R[13] = 0;     R[14] = 0;    R[15] = 1;
-
-  gravity.fill(0);
-  geomagnetic.fill(0);
-
-  return R;
-}
-
-function degToRad(d) {
-  return d * Math.PI / 180;
-}
+let ctx = null;
+let panner = null;
+let filter = null;
+let source = null;
 
 const settings = {
-  fov: 10,
+  fov: 160,
   znear: 1,
   zfar: 2000,
-  aspect:1.0,
-  eyeSeperation: 0.06,
-  convergence: 5000,
+  aspect: 1.0,
+  eyeSeperation: 74.0,
+  convergence: 105.0,
 };
-
-let canvas = document.querySelector("#webglcanvas");
-let gl = canvas.getContext("webgl2");
-let stereoCam
-let spaceball
-let surface
-let shProgram
-var video
-let tex
-
-// Vertex shader
-var vshader = `
-attribute vec4 a_position;
-attribute vec2 a_texcoord;
-
-uniform mat4 ModelViewMatrix;
-uniform mat4 ModelProjectionMatrix;
-
-varying vec2 v_texcoord;
-
-void main() {
-   gl_Position = ModelProjectionMatrix * ModelViewMatrix * a_position;
-}`;
-
-// Fragment shader
-var fshader = `
-precision mediump float;
-
-varying vec2 v_texcoord;
-
-uniform sampler2D u_texture;
-uniform vec4 color;
-
-void main() {
-  gl_FragColor = color;
-}`;
-
-// Compile program
-//var program = compile(gl, vshader, fshader);
-var vertexShader = gl.createShader(gl.VERTEX_SHADER);
-gl.shaderSource(vertexShader, vshader);
-let vertexShaderCompiled = gl.compileShader(vertexShader);
-
-var fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
-gl.shaderSource(fragmentShader, fshader);
-let fragmentShaderCompiled = gl.compileShader(fragmentShader);
-
-var program = gl.createProgram();
-
-// Attach pre-existing shaders
-gl.attachShader(program, vertexShader);
-gl.attachShader(program, fragmentShader);
-gl.linkProgram(program);
-
-if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-  const info = gl.getProgramInfoLog(program);
-  throw `Could not compile WebGL program. \n\n${info}`;
-}
-// look up where the vertex data needs to go.
-var positionLocation = gl.getAttribLocation(program, "a_position");
-
-// lookup uniforms
-
-var matrixLocationView = gl.getUniformLocation(program, "ModelViewMatrix");
-var matrixLocationProjection = gl.getUniformLocation(program, "ModelProjectionMatrix");
-var textureLocation = gl.getUniformLocation(program, "u_texture");
-var translatetozero = m4.translation(0.0, 0.0, -1.0);
-var modelview = [
-  1, 0, 0, 0,
-  0, 1, 0, 0,
-  0, 0, 1, 0,
-  0, 0, 0, 1
-]
 
 webglLessonsUI.setupUI(document.querySelector('#ui'), settings, [
   { type: 'slider',   key: 'fov',        min:   0, max: 360, change: draw, precision: 2, step: 0.001, },
@@ -279,174 +39,334 @@ webglLessonsUI.setupUI(document.querySelector('#ui'), settings, [
   { type: 'slider',   key: 'convergence',       min:   0.0, max: 10000.0, change: draw, precision: 2, step: 0.001, },
 ]);
 
-function StereoCamera(eyeSeperation, 
-    convergence, 
-    fov, 
-    aspect, 
-    znear, 
-    zfar) 
-{
-  this.eyeSeperation = eyeSeperation;
-  this.convergence = convergence;
-  this.znear = znear;
-  this.zfar = zfar;
-  this.fov = fov;
-  this.aspect = aspect;
+// FIGURE CONSTANTS
+const a = 0.7;
+const c = 1;
+const U_MAX = 360;
+const T_MAX = 90;
+const teta = degToRad(30);
 
-  this.applyLeftFrustum = function()
-  {
-    let top, bottom, left, right;
-    top = this.znear * Math.tan(degToRad(this.fov/2));
+function degToRad(d) {
+  return d * Math.PI / 180;
+}
+
+
+// Constructor
+function Model(name) {
+    this.name = name;
+    this.iVertexBuffer = gl.createBuffer();
+    this.iTextureBuffer = gl.createBuffer();
+    this.count = 0;
+
+    this.BufferData = function(vertices, textureList) {
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.iVertexBuffer);
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STREAM_DRAW);
+  
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.iTextureBuffer);
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(textureList), gl.STREAM_DRAW);
+  
+      gl.enableVertexAttribArray(shProgram.iTextCoords);
+      gl.vertexAttribPointer(shProgram.iTextCoords, 2, gl.FLOAT, false, 0, 0);
+  
+      this.count = vertices.length / 3;
+    }
+
+    this.Draw = function() {
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.iVertexBuffer);
+      gl.vertexAttribPointer(shProgram.iAttribVertex, 3, gl.FLOAT, false, 0, 0);
+      gl.enableVertexAttribArray(shProgram.iAttribVertex);
+
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.iTextureBuffer);
+      gl.vertexAttribPointer(shProgram.iTextCoords, 2, gl.FLOAT, false, 0, 0);
+      gl.enableVertexAttribArray(shProgram.iTextCoords);
+    
+      gl.drawArrays(gl.TRIANGLE_STRIP, 0, this.count);
+    }
+
+    this.DrawSphere = function () {
+      this.Draw();
+      gl.drawArrays(gl.LINE_STRIP, 0, this.count);
+    }
+}
+
+
+// Constructor
+function ShaderProgram(name, program) {
+
+    this.name = name;
+    this.prog = program;
+
+    this.iAttribVertex = -1;
+    this.iTextCoords = -1;
+    this.iTextUnit = -1;
+
+    this.Use = function() {
+      gl.useProgram(this.prog);
+    }
+}
+
+function draw() { 
+    gl.clearColor(1, 1, 1, 1);
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    
+    let left, right, top, bottom, far = 2000;
+    top = settings.znear * Math.tan(degToRad(settings.fov) / 2.0);
     bottom = -top;
 
-    let a = this.aspect * Math.tan(degToRad(this.fov / 2)) * this.convergence;
-    let b = a - this.eyeSeperation / 2;
-    let c = a + this.eyeSeperation / 2;
+    let a = Math.tan(degToRad(settings.fov) / 2.0) * settings.convergence;
+    let b = a - settings.eyeSeperation / 2;
+    let c = a + settings.eyeSeperation / 2;
 
-    left = -b * this.znear / this.convergence;
-    right = c * this.znear / this.convergence;
+    left = -b * settings.znear / settings.eyeSeperation;
+    right = c * settings.znear / settings.convergence;
 
-    return m4.frustum(left, right, bottom, top, this.znear, this.zfar);
-  }
+    let leftP = m4.orthographic(left, right, bottom, top, settings.znear, settings.zfar);
 
-  this.applyRightFrustum = function()
-  {
-    const top = Math.tan(degToRad(this.fov)* 0.5) * this.znear;
-    const bottom = -top;
+    left = -c * settings.znear / settings.convergence;
+    right = b * settings.znear / settings.convergence;
 
-    var a = this.aspect * Math.tan(degToRad(this.fov)/2) * this.convergence;
+    let rightP = m4.orthographic(left, right, bottom, top, settings.znear, settings.zfar);
 
-    var b = a - this.eyeSeperation/2;
-    var c = a + this.eyeSeperation/2;
+    /* Get the view matrix from the SimpleRotator object.*/
+    let modelView = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]
 
-    const left = -c * this.znear / this.convergence;
-    const right = b * this.znear / this.convergence;
+    let rotateToPointZero = m4.axisRotation([0.707, 0.707, 0], 0);
 
-    return m4.frustum(left, right, bottom, top, this.znear, this.zfar);
-  }
+    let leftTrans = m4.translation(-0.01, 0, -20);
+    let rightTrans = m4.translation(0.01, 0, -20);
+
+    pos += 0.015;
+    updateSpherePosition(pos, 0, -1, 0.75)
+    const audioPos = [spherePosition[0], spherePosition[1], spherePosition[2]];
+    panner?.setPosition(...audioPos);
+    gl.bindTexture(gl.TEXTURE_2D, null);
+
+    const projection = m4.perspective(degToRad(90), 1, 0.99, 1);
+    const translationSphere = m4.translation(...spherePosition);
+    const modelViewMatrix = m4.multiply(translationSphere, modelView);
+
+    gl.uniformMatrix4fv(shProgram.iModelViewMat, false, projection);
+    gl.uniformMatrix4fv(shProgram.iProjectionMat, false, modelViewMatrix);
+    
+    sphere.DrawSphere();
+
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.clear(gl.DEPTH_BUFFER_BIT);
+
+    gl.uniformMatrix4fv(shProgram.iModelViewMat, false, m4.multiply(leftTrans, modelView));
+    gl.uniformMatrix4fv(shProgram.iProjectionMat, false, leftP);
+    
+    gl.colorMask(true, false, false, false);
+
+    surface.Draw();
+  
+    gl.clear(gl.DEPTH_BUFFER_BIT);
+  
+    gl.uniformMatrix4fv(shProgram.iModelViewMat, false, m4.multiply(rightTrans, modelView));
+    gl.uniformMatrix4fv(shProgram.iProjectionMat, false, rightP);
+
+    gl.colorMask(false, true, true, false);
+
+    surface.Draw();
+
+    gl.colorMask(true, true, true, true);
 }
 
-function Model(name) {
-  this.name = name
-  this.iVertexBuffer = gl.createBuffer();
-  this.count = 0;
-
-  this.BufferData = function(vertices) {
-    gl.bindBuffer(gl.ARRAY_BUFFER, this.iVertexBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
-
-    this.count = vertices.length / 3;
-  }
-
-  this.Draw = function() {
-    gl.vertexAttribPointer(shProgram.iAttribVertex, 3, gl.FLOAT, false, 0, 0);
-    gl.enableVertexAttribArray(shProgram.iAttribVertex);
-
-//    gl.drawArrays(gl.TRIANGLES, 0, 3);
-    gl.drawArrays(gl.LINE_STRIP, 0, this.count);
-  }
-}
-
-function draw() {
-  gl.enable(gl.DEPTH_TEST);
-  gl.colorMask(true, true, true, true);
-  gl.clear(gl.COLOR_BUFFER_BIT);
- 
-
-  stereoCam = new StereoCamera(
-    settings.eyeSeperation, //70
-    settings.convergence, //5000
-    settings.fov, //60
-    settings.aspect, //1.5
-    settings.znear, //1
-    settings.zfar // 20000
-  );
-  let matrleftfrust = stereoCam.applyLeftFrustum();
-  gl.uniformMatrix4fv(shProgram.iModelProjectionMatrix, false, matrleftfrust);
-
-  let matAccum1 = m4.multiply(MatrixRotationModelView, translatetozero);
-
-  let translateLeftEye = m4.translation(-stereoCam.eyeSeperation/2, 0, 0);
-  let modelViewLeft = m4.multiply(matAccum1, translateLeftEye);
-
-  gl.uniformMatrix4fv(shProgram.iModelViewMatrix, false, modelViewLeft);
-  gl.colorMask(true, false, false, true);
-  gl.uniform1i(textureLocation, 0);
-  gl.uniform4fv(shProgram.iColor, [1,1,0,1]);
-  surface.Draw();
-
-  gl.clear(gl.DEPTH_BUFFER_BIT);
-  gl.clearDepth(1);
-  gl.colorMask(false, true, true, true);
-
-  let matrightfrustum = stereoCam.applyRightFrustum();
-
-  let translateRightEye = m4.translation(stereoCam.eyeSeperation / 2, 0, 0);
-  let modelViewRight = m4.multiply(matAccum1, translateRightEye);
-
-  gl.uniformMatrix4fv(shProgram.iModelProjectionMatrix, false, matrightfrustum);
-  gl.uniformMatrix4fv(shProgram.iModelViewMatrix, false, modelViewRight);
-  surface.Draw();
-
-  gl.clear(gl.DEPTH_BUFFER_BIT);
-  gl.clearDepth(1);
-  gl.colorMask(true, true, true, true);
-  gl.uniform4fv(shProgram.iColor, [1,1,1,1]);
-}
-
-function main() {
-  // Get A WebGL context
-  if (!gl) {
-    return;
-  }
-//  spaceball = new SimpleRotator(canvas, draw, 10);
-  initGL();
-  draw();
-}
-
-function createSurfaceData()
-{  
+const CreateSurfaceData = () => {
+  let textureList = [];
   let vertexList = [];
 
-  for (let i = 0; i < 360; i++) {
-    vertexList.push( Math.sin(degToRad(i), 1, Math.cos(degToRad(i))));
-    vertexList.push( Math.sin(degToRad(i), 0, Math.cos(degToRad(i))))
+  let calculateTu = (u, t) => [u / U_MAX, (t + 90) / T_MAX + 90];
+  const scale = 1;
+
+  for (let t = -90; t <= T_MAX; t += 1) {
+      for (let u = 0; u <= U_MAX; u += 1) {
+      const uRad = degToRad(u);
+      const tRad = degToRad(t);
+
+      const x = (a + tRad * Math.cos(teta) + c * (tRad * tRad) * Math.sin(teta)) * Math.cos(uRad);
+      const y = (a + tRad * Math.cos(teta) + c * (tRad * tRad) * Math.sin(teta)) * Math.sin(uRad);
+      const z = -tRad * Math.sin(teta) + c * (tRad * tRad) * Math.cos(teta); 
+
+      vertexList.push(x * scale, y * scale, z * scale);
+      textureList.push(...calculateTu(u, t));
+
+      const uNext = degToRad(u + 1);
+      const tNext = degToRad(t + 1);
+
+      const xNext = (a + tNext * Math.cos(teta) + c * (tNext * tNext) * Math.sin(teta)) * Math.cos(uNext);
+      const yNext = (a + tNext * Math.cos(teta) + c * (tNext * tNext) * Math.sin(teta)) * Math.sin(uNext);
+      const zNext = -tNext * Math.sin(teta) + c * (tNext * tNext) * Math.cos(teta); 
+
+      vertexList.push(xNext * scale, yNext * scale, zNext * scale);
+      textureList.push(...calculateTu(u + 1, t + 1));
+      
+    }
   }
-  
-  return vertexList;
+
+  return { vertexList, textureList };
 }
 
+const CreateSphereData = (segmentsI, segmentsJ) => {
+  let vertexList = [];
+  let textureList = [];
+
+  for (let i = 0; i <= segmentsI; i++) {
+    const theta = i * Math.PI / segmentsI;
+
+    for (let j = 0; j <= segmentsJ; j++) {
+      const phi = j * 2 * Math.PI / segmentsJ;
+
+      vertexList.push(
+        Math.cos(phi) * Math.sin(theta),
+        Math.cos(theta),
+        Math.sin(phi) * Math.sin(theta)
+      );
+
+      textureList.push(1 - (j / segmentsJ), 1 - (i / segmentsI));
+    }
+  }
+
+  return { vertexList, textureList };
+}
+
+
+/* Initialize the WebGL context. Called from init() */
 function initGL() {
+    let prog = createProgram( gl, vertexShaderSource, fragmentShaderSource );
+
+    shProgram = new ShaderProgram('Basic', prog);
+    shProgram.Use();
+
+    shProgram.iAttribVertex = gl.getAttribLocation(prog, 'vertex');
+    shProgram.iModelViewMat = gl.getUniformLocation(prog, 'ModelViewMatrix');
+    shProgram.iProjectionMat = gl.getUniformLocation(prog, 'ProjectionMatrix');
   
-//  let prog = createProgram(gl, vshader, fshader);
-  shProgram = new ShaderProgram('Basic', program);
-  shProgram.Use();
+    shProgram.iTextCoords = gl.getAttribLocation(prog, 'textCoords');
+    shProgram.iTextUnit = gl.getUniformLocation(prog, 'uTexture');
 
-  shProgram.iAttribVertex = gl.getAttribLocation(program, "a_position");
-  shProgram.iModelViewMatrix = gl.getUniformLocation(program, "ModelViewMatrix");
-  shProgram.iModelProjectionMatrix = gl.getUniformLocation(program, "ModelProjectionMatrix");
-  shProgram.iColor = gl.getUniformLocation(program, "color");
+    surface = new Model('Surface');
+    BG = new Model('Background');
+    sphere = new Model('Sphere');
 
-  surface = new Model("Surface");
-  surface.BufferData(createSurfaceData());
+    let surfaceData = CreateSurfaceData();
+    surface.BufferData(surfaceData.vertexList, surfaceData.textureList);
 
-  gl.enable(gl.DEPTH_TEST);
+    BG.BufferData(
+      [ 0.0, 0.0, 0.0, 1.0,  0.0, 0.0, 1.0, 1.0,  0.0, 1.0, 1.0, 0.0,  0.0, 1.0, 0.0, 0.0, 0.0, 0.0],
+      [ 1, 1, 0, 1,  0, 0, 0, 0,  1, 0, 1, 1],
+    );
+
+    let sphereData = CreateSphereData(500, 500);
+    sphere.BufferData(sphereData.vertexList, sphereData.textureList);
+
+    LoadTexture();
+    gl.enable(gl.DEPTH_TEST);
 }
 
-function ShaderProgram(name, program) {
-  
-  this.name = name
-  this.prog = program
-
-  // Location of the attribute variable in the shader program
-  this.iAttribVertex = -1;
-  this.iColor = -1;
-  this.iModelViewMatrix = -1;
-  this.iModelProjectionMatrix = -1;
-
-  this.Use = function() {
-    gl.useProgram(this.prog);
-  }
+function createProgram(gl, vShader, fShader) {
+    let vsh = gl.createShader( gl.VERTEX_SHADER );
+    gl.shaderSource(vsh,vShader);
+    gl.compileShader(vsh);
+    if ( ! gl.getShaderParameter(vsh, gl.COMPILE_STATUS) ) {
+        throw new Error("Error in vertex shader:  " + gl.getShaderInfoLog(vsh));
+     }
+    let fsh = gl.createShader( gl.FRAGMENT_SHADER );
+    gl.shaderSource(fsh, fShader);
+    gl.compileShader(fsh);
+    if ( ! gl.getShaderParameter(fsh, gl.COMPILE_STATUS) ) {
+       throw new Error("Error in fragment shader:  " + gl.getShaderInfoLog(fsh));
+    }
+    let prog = gl.createProgram();
+    gl.attachShader(prog,vsh);
+    gl.attachShader(prog, fsh);
+    gl.linkProgram(prog);
+    if ( ! gl.getProgramParameter( prog, gl.LINK_STATUS) ) {
+       throw new Error("Link error in program:  " + gl.getProgramInfoLog(prog));
+    }
+    return prog;
 }
 
-main();
+const rerender = () => {
+  draw();
+  window.requestAnimationFrame(rerender);
+}
+
+/**
+ * initialization function that will be called when the page has loaded
+ */
+function init() {
+    let canvas;
+    try {
+        canvas = document.querySelector("#webglcanvas");
+        gl = canvas.getContext("webgl");
+
+        if ( ! gl ) {
+            throw "Browser does not support WebGL";
+        }
+    }
+    catch (e) {
+        console.log('Error webglcanvas');
+        return;
+    }
+    try {
+        initGL();  // initialize the WebGL graphics context
+    }
+    catch (e) {
+        console.log('Error initGL()');
+    }
+
+  document.getElementById('filter').addEventListener('change', async (e) => {
+    const isChecked = e.target.checked
+    if (isChecked) {
+      panner?.disconnect()
+      panner?.connect?.(filter)
+      filter?.connect?.(ctx.destination)
+    } else {
+      panner?.disconnect()
+      panner?.connect?.(ctx.destination)
+    }
+  })
+
+  document.getElementById('audio').addEventListener('play', (e) => {
+    if (!ctx) {
+      ctx = new (window.AudioContext || window.webkitAudioContext)();
+  
+      source = ctx.createMediaElementSource(audio);
+      panner = ctx.createPanner();
+      filter = ctx.createBiquadFilter();
+
+      source.connect(panner);
+      panner.connect(filter);
+      filter.connect(ctx.destination);
+
+      filter.type = "highpass";
+      filter.frequency.value = 1500;
+      ctx.resume();
+    }
+  });
+
+  rerender();
+}
+
+const LoadTexture = () => {
+  const image = new Image();
+  image.src =
+    'https://www.the3rdsequence.com/texturedb/download/116/texture/jpg/1024/irregular+wood+planks-1024x1024.jpg';
+  image.crossOrigin = 'anonymous';
+
+  image.addEventListener('load', () => {
+    texture = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
+  });
+}
+
+function updateSpherePosition(newPos) {
+  spherePosition[0] = Math.cos(newPos) * 0.75;
+  spherePosition[2] = -1 + Math.sin(newPos) * 0.75;
+}
+
+init()
