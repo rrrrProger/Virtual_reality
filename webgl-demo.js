@@ -1,6 +1,7 @@
 'use strict';
 
 //x(t)=Rcost,y(t)=Rsin(t),z(t)=at
+const socket = new WebSocket('ws://Pixel-4.netis:8080/sensors/connect?types=["android.sensor.accelerometer", "android.sensor.magnetic_field", "android.sensor.gyroscope"]')
 
 let gl;
 let surface;
@@ -21,6 +22,7 @@ socket.onmessage = function (e) {
   var type = data.type;
   var values = data.values;
   var timestamp = data.timestamp;
+  var matrixRotationModelView = null;
 
   switch (type) {
     case 'android.sensor.accelerometer':
@@ -38,14 +40,15 @@ socket.onmessage = function (e) {
     rotationMatrixFromMagnetometerAndAccelerometer = getRotationMatrixFromMagnetometerAndAccelerometer(accelerometerVector, magnetometerVector);
   }
   if (!matrixFromGyroscope.every(item => item === 0)) {
-    MatrixRotationModelView = constructModelViewMatrix(rotationMatrixFromMagnetometerAndAccelerometer, matrixFromGyroscope);
+    matrixRotationModelView = constructModelViewMatrix(rotationMatrixFromMagnetometerAndAccelerometer, matrixFromGyroscope);
   }
-  draw();
+
+  draw(matrixRotationModelView);
 };
 
 function constructModelViewMatrix(rotationMatrixFromMagnetometerAndAccelerometer, matrixFromGyroscope) {
-  var weightGyroscope = 0.5;
-  var weightMagnetometerAndAccelerometer = 0.5;
+  var weightGyroscope = 0.9;
+  var weightMagnetometerAndAccelerometer = 0.1;
   var resultModelView = new Float32Array(16);
 
   resultModelView.forEach((element, index) => resultModelView[index] = weightGyroscope * matrixFromGyroscope[index] + weightMagnetometerAndAccelerometer * rotationMatrixFromMagnetometerAndAccelerometer[index]);
@@ -221,7 +224,6 @@ socket.addEventListener("message", event => {
   deltaRotationVector[3] = cosThetaOverTwo
   last_timestamp = data.timestamp;
   getRotationMatrixFromVector(deltaRotationMatrix, deltaRotationVector);
-  console.log(deltaRotationMatrix);
   matrixRotationModelView = deltaRotationMatrix;
   draw(matrixRotationModelView);
 });
@@ -388,7 +390,7 @@ function ShaderProgram(name, program) {
     }
 }
 
-function draw(matrixRotationModelView) { 
+function draw(resultModelView) { 
     gl.clearColor(1, 1, 1, 1);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     
@@ -414,7 +416,9 @@ function draw(matrixRotationModelView) {
   
     gl.bindTexture(gl.TEXTURE_2D, null);
 
-    const modelViewMatrix = matrixRotationModelView;
+    var modelViewMatrix = null;
+
+    resultModelView ? modelViewMatrix = resultModelView : modelViewStart;
 
     gl.uniformMatrix4fv(shProgram.iModelViewMat, false, modelViewMatrix);
     gl.uniformMatrix4fv(shProgram.iProjectionMat, false, projectionStart);
