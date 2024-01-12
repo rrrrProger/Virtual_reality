@@ -1,13 +1,27 @@
 'use strict';
 
+//x(t)=Rcost,y(t)=Rsin(t),z(t)=at
+
+let gl;
+let surface;
+let shProgram;
+let texture;
+
+let stereoCam = null;
+let rSurface = 1;
+let aSurface = 1;
+
+const settings = {
+  fov: 110,
+  znear: 1,
+  zfar: 2000,
+  aspect: 1.0,
+  eyeSeperation: 77.0,
+  convergence: 1517.0,
+};
+
 const socket = new WebSocket('ws://Pixel-4.netis:8080/sensor/connect?type=android.sensor.gyroscope');
 var last_timestamp = 0;
-var MatrixRotationModelView = [
-  1, 0, 0, 0,
-  0, 1, 0, 0,
-  0, 0, 1, 0,
-  0, 0, 0, 1
-]
 
 socket.addEventListener("message", event => {
   var data = JSON.parse(event.data);
@@ -15,11 +29,11 @@ socket.addEventListener("message", event => {
   var deltaRotationVector = new Float32Array(4);
   var NS2S = 1.0 / 1000000000.0;
   var values = data.values;
-  var eps = 0.00000000000001;
   var axisX = values[0];
   var axisY = values[1];
   var axisZ = values[2];
   var dT = (data.timestamp - last_timestamp) * NS2S;
+  var matrixRotationModelView = null;
 
   var omegaMagnitude = Math.sqrt(axisX * axisX + axisY * axisY + axisZ * axisZ);
   axisX = axisX / omegaMagnitude;
@@ -35,8 +49,8 @@ socket.addEventListener("message", event => {
   last_timestamp = data.timestamp;
   getRotationMatrixFromVector(deltaRotationMatrix, deltaRotationVector);
   console.log(deltaRotationMatrix);
-  MatrixRotationModelView = deltaRotationMatrix;
-  draw();
+  matrixRotationModelView = deltaRotationMatrix;
+  draw(matrixRotationModelView);
 });
 
 function getRotationMatrixFromVector(deltaRotationMatrix, deltaRotationVector) {
@@ -93,107 +107,21 @@ function getRotationMatrixFromVector(deltaRotationMatrix, deltaRotationVector) {
   }
 }
 
+webglLessonsUI.setupUI(document.querySelector('#ui'), settings, [
+  { type: 'slider',   key: 'fov',              min:   0, max: 360, change: draw, precision: 2, step: 0.001, },
+  { type: 'slider',   key: 'aspect',           min:   0.1, max: 10.0, change: draw, precision: 2, step: 0.001, },
+  { type: 'slider',   key: 'znear',            min:   1.0, max: 1000.0, change: draw, precision: 2, step: 0.001, },
+  { type: 'slider',   key: 'zfar',             min:   1.0, max: 2000.0, change: draw, precision: 2, step: 0.001, },
+  { type: 'slider',   key: 'eyeSeperation',    min:   0.01, max: 499.0, change: draw, precision: 2, step: 0.001, },
+  { type: 'slider',   key: 'convergence',      min:   0.0, max: 10000.0, change: draw, precision: 2, step: 0.001, },
+]);
+
 function degToRad(d) {
   return d * Math.PI / 180;
 }
 
-const settings = {
-  fov: 10,
-  znear: 1,
-  zfar: 2000,
-  aspect:1.0,
-  eyeSeperation: 0.06,
-  convergence: 5000,
-};
-
-let canvas = document.querySelector("#webglcanvas");
-let gl = canvas.getContext("webgl2");
-let stereoCam
-let spaceball
-let surface
-let shProgram
-var video
-let tex
-
-// Vertex shader
-var vshader = `
-attribute vec4 a_position;
-attribute vec2 a_texcoord;
-
-uniform mat4 ModelViewMatrix;
-uniform mat4 ModelProjectionMatrix;
-
-varying vec2 v_texcoord;
-
-void main() {
-   gl_Position = ModelProjectionMatrix * ModelViewMatrix * a_position;
-}`;
-
-// Fragment shader
-var fshader = `
-precision mediump float;
-
-varying vec2 v_texcoord;
-
-uniform sampler2D u_texture;
-uniform vec4 color;
-
-void main() {
-  gl_FragColor = color;
-}`;
-
-// Compile program
-//var program = compile(gl, vshader, fshader);
-var vertexShader = gl.createShader(gl.VERTEX_SHADER);
-gl.shaderSource(vertexShader, vshader);
-let vertexShaderCompiled = gl.compileShader(vertexShader);
-
-var fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
-gl.shaderSource(fragmentShader, fshader);
-let fragmentShaderCompiled = gl.compileShader(fragmentShader);
-
-var program = gl.createProgram();
-
-// Attach pre-existing shaders
-gl.attachShader(program, vertexShader);
-gl.attachShader(program, fragmentShader);
-gl.linkProgram(program);
-
-if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-  const info = gl.getProgramInfoLog(program);
-  throw `Could not compile WebGL program. \n\n${info}`;
-}
-// look up where the vertex data needs to go.
-var positionLocation = gl.getAttribLocation(program, "a_position");
-
-// lookup uniforms
-
-var matrixLocationView = gl.getUniformLocation(program, "ModelViewMatrix");
-var matrixLocationProjection = gl.getUniformLocation(program, "ModelProjectionMatrix");
-var textureLocation = gl.getUniformLocation(program, "u_texture");
-var translatetozero = m4.translation(0.0, 0.0, -1.0);
-var modelview = [
-  1, 0, 0, 0,
-  0, 1, 0, 0,
-  0, 0, 1, 0,
-  0, 0, 0, 1
-]
-
-webglLessonsUI.setupUI(document.querySelector('#ui'), settings, [
-  { type: 'slider',   key: 'fov',        min:   0, max: 360, change: draw, precision: 2, step: 0.001, },
-  { type: 'slider',   key: 'aspect',     min:   0.1, max: 10.0, change: draw, precision: 2, step: 0.001, },
-  { type: 'slider',   key: 'znear',      min:   1.0, max: 1000.0, change: draw, precision: 2, step: 0.001, },
-  { type: 'slider',   key: 'zfar',       min:   1.0, max: 2000.0, change: draw, precision: 2, step: 0.001, },
-  { type: 'slider',   key: 'eyeSeperation',    min:   0.01, max: 100.0, change: draw, precision: 2, step: 0.001, },
-  { type: 'slider',   key: 'convergence',       min:   0.0, max: 10000.0, change: draw, precision: 2, step: 0.001, },
-]);
-
-function StereoCamera(eyeSeperation, 
-    convergence, 
-    fov, 
-    aspect, 
-    znear, 
-    zfar) 
+function StereoCamera(eyeSeperation, convergence, 
+                      fov, aspect, znear, zfar) 
 {
   this.eyeSeperation = eyeSeperation;
   this.convergence = convergence;
@@ -236,126 +164,206 @@ function StereoCamera(eyeSeperation,
 }
 
 function Model(name) {
-  this.name = name
-  this.iVertexBuffer = gl.createBuffer();
-  this.count = 0;
+    this.name = name;
+    this.iVertexBuffer = gl.createBuffer();
+    this.iTextureBuffer = gl.createBuffer();
+    this.count = 0;
 
-  this.BufferData = function(vertices) {
-    gl.bindBuffer(gl.ARRAY_BUFFER, this.iVertexBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
+    this.BufferData = function(vertices, textureList) {
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.iVertexBuffer);
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STREAM_DRAW);
+  
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.iTextureBuffer);
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(textureList), gl.STREAM_DRAW);
+  
+      gl.enableVertexAttribArray(shProgram.iTextCoords);
+      gl.vertexAttribPointer(shProgram.iTextCoords, 2, gl.FLOAT, false, 0, 0);
+  
+      this.count = vertices.length / 3;
+    }
 
-    this.count = vertices.length / 3;
-  }
+    this.Draw = function() {
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.iVertexBuffer);
+      gl.vertexAttribPointer(shProgram.iAttribVertex, 3, gl.FLOAT, false, 0, 0);
+      gl.enableVertexAttribArray(shProgram.iAttribVertex);
 
-  this.Draw = function() {
-    gl.vertexAttribPointer(shProgram.iAttribVertex, 3, gl.FLOAT, false, 0, 0);
-    gl.enableVertexAttribArray(shProgram.iAttribVertex);
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.iTextureBuffer);
+      gl.vertexAttribPointer(shProgram.iTextCoords, 2, gl.FLOAT, false, 0, 0);
+      gl.enableVertexAttribArray(shProgram.iTextCoords);
+    
+      gl.drawArrays(gl.TRIANGLE_STRIP, 0, this.count);
+    }
 
-//    gl.drawArrays(gl.TRIANGLES, 0, 3);
-    gl.drawArrays(gl.LINE_STRIP, 0, this.count);
-  }
+    this.DrawSphere = function () {
+      this.Draw();
+      gl.drawArrays(gl.LINE_STRIP, 0, this.count);
+    }
 }
 
-function draw() {
-  gl.enable(gl.DEPTH_TEST);
-  gl.colorMask(true, true, true, true);
-  gl.clear(gl.COLOR_BUFFER_BIT);
- 
+// Constructor
+function ShaderProgram(name, program) {
 
-  stereoCam = new StereoCamera(
-    settings.eyeSeperation, //70
-    settings.convergence, //5000
-    settings.fov, //60
-    settings.aspect, //1.5
-    settings.znear, //1
-    settings.zfar // 20000
-  );
-  let matrleftfrust = stereoCam.applyLeftFrustum();
-  gl.uniformMatrix4fv(shProgram.iModelProjectionMatrix, false, matrleftfrust);
+    this.name = name;
+    this.prog = program;
 
-  let matAccum1 = m4.multiply(MatrixRotationModelView, translatetozero);
+    this.iAttribVertex = -1;
+    this.iTextCoords = -1;
+    this.iTextUnit = -1;
 
-  let translateLeftEye = m4.translation(-stereoCam.eyeSeperation/2, 0, 0);
-  let modelViewLeft = m4.multiply(matAccum1, translateLeftEye);
-
-  gl.uniformMatrix4fv(shProgram.iModelViewMatrix, false, modelViewLeft);
-  gl.colorMask(true, false, false, true);
-  gl.uniform1i(textureLocation, 0);
-  gl.uniform4fv(shProgram.iColor, [1,1,0,1]);
-  surface.Draw();
-
-  gl.clear(gl.DEPTH_BUFFER_BIT);
-  gl.clearDepth(1);
-  gl.colorMask(false, true, true, true);
-
-  let matrightfrustum = stereoCam.applyRightFrustum();
-
-  let translateRightEye = m4.translation(stereoCam.eyeSeperation / 2, 0, 0);
-  let modelViewRight = m4.multiply(matAccum1, translateRightEye);
-
-  gl.uniformMatrix4fv(shProgram.iModelProjectionMatrix, false, matrightfrustum);
-  gl.uniformMatrix4fv(shProgram.iModelViewMatrix, false, modelViewRight);
-  surface.Draw();
-
-  gl.clear(gl.DEPTH_BUFFER_BIT);
-  gl.clearDepth(1);
-  gl.colorMask(true, true, true, true);
-  gl.uniform4fv(shProgram.iColor, [1,1,1,1]);
+    this.Use = function() {
+      gl.useProgram(this.prog);
+    }
 }
 
-function main() {
-  // Get A WebGL context
-  if (!gl) {
-    return;
-  }
-//  spaceball = new SimpleRotator(canvas, draw, 10);
-  initGL();
-  draw();
+function draw(matrixRotationModelView) { 
+    gl.clearColor(1, 1, 1, 1);
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    
+    stereoCam = new StereoCamera(
+      settings.eyeSeperation,
+      settings.convergence,
+      settings.fov,
+      settings.aspect,
+      settings.znear,
+      settings.zfar
+    );
+
+    var leftFrustum  =   stereoCam.applyLeftFrustum();
+    var rightFrustum =   stereoCam.applyRightFrustum();
+    let leftTranslate =   m4.translation(-0.01, 0.2, -20);
+    let rightTranslate   =   m4.translation( 0.01, 0.2, -20);
+  
+    /* Set up identity modelView matrix */
+    const modelViewStart = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]
+  
+    /* Set starting projection Matrix */
+    const projectionStart = m4.perspective(degToRad(90), 1, 0.99, 1);
+  
+    gl.bindTexture(gl.TEXTURE_2D, null);
+
+    const modelViewMatrix = matrixRotationModelView;
+
+    gl.uniformMatrix4fv(shProgram.iModelViewMat, false, modelViewMatrix);
+    gl.uniformMatrix4fv(shProgram.iProjectionMat, false, projectionStart);
+    
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.clear(gl.DEPTH_BUFFER_BIT);
+
+    gl.uniformMatrix4fv(shProgram.iModelViewMat, false, m4.multiply(leftTranslate, modelViewMatrix));
+    gl.uniformMatrix4fv(shProgram.iProjectionMat, false, leftFrustum);
+    
+    gl.colorMask(true, false, false, false);
+
+    surface.Draw();
+  
+    gl.clear(gl.DEPTH_BUFFER_BIT);
+  
+    gl.uniformMatrix4fv(shProgram.iModelViewMat, false, m4.multiply(rightTranslate, modelViewMatrix));
+    gl.uniformMatrix4fv(shProgram.iProjectionMat, false, rightFrustum);
+
+    gl.colorMask(false, true, true, false);
+
+    surface.Draw();
+
+    gl.colorMask(true, true, true, true);
 }
 
-function createSurfaceData()
-{  
+const CreateSurfaceData = () => {
+  let textureList = [];
   let vertexList = [];
 
-  for (let i = 0; i < 360; i++) {
-    vertexList.push( Math.sin(degToRad(i), 1, Math.cos(degToRad(i))));
-    vertexList.push( Math.sin(degToRad(i), 0, Math.cos(degToRad(i))))
+  for (let i = 0; i < 90; i++) {
+    vertexList.push( rSurface * Math.cos(i) * settings.aspect, rSurface * Math.sin(i) * settings.aspect, aSurface * i * settings.aspect);
+    textureList.push( rSurface * Math.cos(i) * settings.aspect, rSurface * Math.sin(i) * settings.aspect, aSurface * i * settings.aspect);
   }
   
-  return vertexList;
+  return { vertexList, textureList };
 }
 
+/* Initialize the WebGL context. Called from init() */
 function initGL() {
+    let prog = createProgram( gl, vertexShaderSource, fragmentShaderSource );
+
+    shProgram = new ShaderProgram('Basic', prog);
+    shProgram.Use();
+
+    shProgram.iAttribVertex = gl.getAttribLocation(prog, 'vertex');
+    shProgram.iModelViewMat = gl.getUniformLocation(prog, 'ModelViewMatrix');
+    shProgram.iProjectionMat = gl.getUniformLocation(prog, 'ProjectionMatrix');
   
-//  let prog = createProgram(gl, vshader, fshader);
-  shProgram = new ShaderProgram('Basic', program);
-  shProgram.Use();
+    shProgram.iTextCoords = gl.getAttribLocation(prog, 'textureCoordinates');
+    shProgram.iTextUnit = gl.getUniformLocation(prog, 'uTexture');
 
-  shProgram.iAttribVertex = gl.getAttribLocation(program, "a_position");
-  shProgram.iModelViewMatrix = gl.getUniformLocation(program, "ModelViewMatrix");
-  shProgram.iModelProjectionMatrix = gl.getUniformLocation(program, "ModelProjectionMatrix");
-  shProgram.iColor = gl.getUniformLocation(program, "color");
-
-  surface = new Model("Surface");
-  surface.BufferData(createSurfaceData());
-
-  gl.enable(gl.DEPTH_TEST);
+    surface = new Model('Surface');
+    let surfaceData = CreateSurfaceData();
+    surface.BufferData(surfaceData.vertexList, surfaceData.textureList);
+    
+    LoadTexture();
+    gl.enable(gl.DEPTH_TEST);
 }
 
-function ShaderProgram(name, program) {
-  
-  this.name = name
-  this.prog = program
-
-  // Location of the attribute variable in the shader program
-  this.iAttribVertex = -1;
-  this.iColor = -1;
-  this.iModelViewMatrix = -1;
-  this.iModelProjectionMatrix = -1;
-
-  this.Use = function() {
-    gl.useProgram(this.prog);
-  }
+/*
+* Create program to compile vertex shader and fragment shader
+*/
+function createProgram(gl, vShader, fShader) {
+    let vertexShader = gl.createShader( gl.VERTEX_SHADER );
+    gl.shaderSource(vertexShader, vShader);
+    gl.compileShader(vertexShader);
+    if ( ! gl.getShaderParameter(vertexShader, gl.COMPILE_STATUS) ) {
+        throw new Error("Error in vertex shader:  " + gl.getShaderInfoLog(vertexShader));
+     }
+    let fragmentShader = gl.createShader( gl.FRAGMENT_SHADER );
+    gl.shaderSource(fragmentShader, fShader);
+    gl.compileShader(fragmentShader);
+    if ( ! gl.getShaderParameter(fragmentShader, gl.COMPILE_STATUS) ) {
+       throw new Error("Error in fragment shader:  " + gl.getShaderInfoLog(fragmentShader));
+    }
+    let prog = gl.createProgram();
+    gl.attachShader(prog, vertexShader);
+    gl.attachShader(prog, fragmentShader);
+    gl.linkProgram(prog);
+    if ( ! gl.getProgramParameter( prog, gl.LINK_STATUS) ) {
+       throw new Error("Link error in program:  " + gl.getProgramInfoLog(prog));
+    }
+    return prog;
 }
 
-main();
+const LoadTexture = () => {
+  const image = new Image();
+  image.src =
+    'https://www.the3rdsequence.com/texturedb/download/116/texture/jpg/1024/irregular+wood+planks-1024x1024.jpg';
+  image.crossOrigin = 'anonymous';
+
+  image.addEventListener('load', () => {
+    texture = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
+  });
+}
+
+function init() {
+    let canvas;
+    try {
+        canvas = document.querySelector("#webglcanvas");
+        gl = canvas.getContext("webgl");
+
+        if ( ! gl ) {
+            throw "Browser does not support WebGL";
+        }
+    }
+    catch (e) {
+        console.log('Error webglcanvas');
+        return;
+    }
+    try {
+        initGL();  // initialize the WebGL graphics context
+        draw();
+    }
+    catch (e) {
+        console.log('Error initGL()');
+    }
+}
+
+init()
