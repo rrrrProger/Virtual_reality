@@ -5,15 +5,11 @@
 let gl;
 let surface;
 let shProgram;
-let spaceball;
 let texture;
-let cameraText;
-let video;
-let BG;
 
 let sphere = null;
 let angularSphereVelocity = 0;
-let spherePosition = [0, 0, 0];
+let sphereCoords = [0, 0, 0];
 let startSphereX = 0.7;
 let startSphereY = 1;
 let startSphereZ = 0.7;
@@ -160,8 +156,8 @@ function draw() {
 
     var leftFrustum  =   stereoCam.applyLeftFrustum();
     var rightFrustum =   stereoCam.applyRightFrustum();
-    let leftTrans    =   m4.translation(-0.01, 0.2, -20);
-    let rightTrans   =   m4.translation( 0.01, 0.2, -20);
+    let leftTranslate =   m4.translation(-0.01, 0.2, -20);
+    let rightTranslate   =   m4.translation( 0.01, 0.2, -20);
   
     /* Set up identity modelView matrix */
     const modelViewStart = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]
@@ -171,14 +167,14 @@ function draw() {
 
     angularSphereVelocity += settings.speedRotation;
     rotateSpere(angularSphereVelocity);
-    const audioPos = [spherePosition[0], spherePosition[1], spherePosition[2]];
+    const audioPos = [sphereCoords[0], sphereCoords[1], sphereCoords[2]];
   
     /* If audioPanner not null set position */
     audioPanner?.setPosition(...audioPos);
   
     gl.bindTexture(gl.TEXTURE_2D, null);
 
-    const translationSphere = m4.translation(...spherePosition);
+    const translationSphere = m4.translation(...sphereCoords);
     const modelViewMatrix = m4.multiply(translationSphere, modelViewStart);
 
     gl.uniformMatrix4fv(shProgram.iModelViewMat, false, projectionStart);
@@ -189,7 +185,7 @@ function draw() {
     gl.bindTexture(gl.TEXTURE_2D, texture);
     gl.clear(gl.DEPTH_BUFFER_BIT);
 
-    gl.uniformMatrix4fv(shProgram.iModelViewMat, false, m4.multiply(leftTrans, modelViewStart));
+    gl.uniformMatrix4fv(shProgram.iModelViewMat, false, m4.multiply(leftTranslate, modelViewStart));
     gl.uniformMatrix4fv(shProgram.iProjectionMat, false, leftFrustum);
     
     gl.colorMask(true, false, false, false);
@@ -198,7 +194,7 @@ function draw() {
   
     gl.clear(gl.DEPTH_BUFFER_BIT);
   
-    gl.uniformMatrix4fv(shProgram.iModelViewMat, false, m4.multiply(rightTrans, modelViewStart));
+    gl.uniformMatrix4fv(shProgram.iModelViewMat, false, m4.multiply(rightTranslate, modelViewStart));
     gl.uniformMatrix4fv(shProgram.iProjectionMat, false, rightFrustum);
 
     gl.colorMask(false, true, true, false);
@@ -258,44 +254,41 @@ function initGL() {
     shProgram.iModelViewMat = gl.getUniformLocation(prog, 'ModelViewMatrix');
     shProgram.iProjectionMat = gl.getUniformLocation(prog, 'ProjectionMatrix');
   
-    shProgram.iTextCoords = gl.getAttribLocation(prog, 'textCoords');
+    shProgram.iTextCoords = gl.getAttribLocation(prog, 'textureCoordinates');
     shProgram.iTextUnit = gl.getUniformLocation(prog, 'uTexture');
 
     surface = new Model('Surface');
-    BG = new Model('Background');
-    sphere = new Model('Sphere');
+    sphere  = new Model('Sphere');
 
     let surfaceData = CreateSurfaceData();
     surface.BufferData(surfaceData.vertexList, surfaceData.textureList);
 
-    BG.BufferData(
-      [ 0.0, 0.0, 0.0, 1.0,  0.0, 0.0, 1.0, 1.0,  0.0, 1.0, 1.0, 0.0,  0.0, 1.0, 0.0, 0.0, 0.0, 0.0],
-      [ 1, 1, 0, 1,  0, 0, 0, 0,  1, 0, 1, 1],
-    );
-
-    let sphereData = CreateSphereData(500, 500);
+    let sphereData = CreateSphereData(300, 300);
     sphere.BufferData(sphereData.vertexList, sphereData.textureList);
 
     LoadTexture();
     gl.enable(gl.DEPTH_TEST);
 }
 
+/*
+* Create program to compile vertex shader and fragment shader
+*/
 function createProgram(gl, vShader, fShader) {
-    let vsh = gl.createShader( gl.VERTEX_SHADER );
-    gl.shaderSource(vsh,vShader);
-    gl.compileShader(vsh);
-    if ( ! gl.getShaderParameter(vsh, gl.COMPILE_STATUS) ) {
-        throw new Error("Error in vertex shader:  " + gl.getShaderInfoLog(vsh));
+    let vertexShader = gl.createShader( gl.VERTEX_SHADER );
+    gl.shaderSource(vertexShader, vShader);
+    gl.compileShader(vertexShader);
+    if ( ! gl.getShaderParameter(vertexShader, gl.COMPILE_STATUS) ) {
+        throw new Error("Error in vertex shader:  " + gl.getShaderInfoLog(vertexShader));
      }
-    let fsh = gl.createShader( gl.FRAGMENT_SHADER );
-    gl.shaderSource(fsh, fShader);
-    gl.compileShader(fsh);
-    if ( ! gl.getShaderParameter(fsh, gl.COMPILE_STATUS) ) {
-       throw new Error("Error in fragment shader:  " + gl.getShaderInfoLog(fsh));
+    let fragmentShader = gl.createShader( gl.FRAGMENT_SHADER );
+    gl.shaderSource(fragmentShader, fShader);
+    gl.compileShader(fragmentShader);
+    if ( ! gl.getShaderParameter(fragmentShader, gl.COMPILE_STATUS) ) {
+       throw new Error("Error in fragment shader:  " + gl.getShaderInfoLog(fragmentShader));
     }
     let prog = gl.createProgram();
-    gl.attachShader(prog, vsh);
-    gl.attachShader(prog, fsh);
+    gl.attachShader(prog, vertexShader);
+    gl.attachShader(prog, fragmentShader);
     gl.linkProgram(prog);
     if ( ! gl.getProgramParameter( prog, gl.LINK_STATUS) ) {
        throw new Error("Link error in program:  " + gl.getProgramInfoLog(prog));
@@ -376,9 +369,9 @@ const LoadTexture = () => {
 
 function rotateSpere(angularSphereVelocity) {
   /* Rotate sphere around y (change x and z) */
-  spherePosition[0] = Math.cos(angularSphereVelocity) * startSphereX;
-  spherePosition[1] = spherePosition[1]
-  spherePosition[2] = -1 + Math.sin(angularSphereVelocity) * startSphereZ;
+  sphereCoords[0] = Math.cos(angularSphereVelocity) * startSphereX;
+  sphereCoords[1] = sphereCoords[1]
+  sphereCoords[2] = -1 + Math.sin(angularSphereVelocity) * startSphereZ;
 }
 
 init()
