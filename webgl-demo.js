@@ -293,11 +293,6 @@ function createProgram(gl, vShader, fShader) {
     return prog;
 }
 
-const rerender = () => {
-  draw();
-  window.requestAnimationFrame(rerender);
-}
-
 function init() {
     let canvas;
     try {
@@ -351,7 +346,7 @@ function init() {
     }
   });
 
-  rerender();
+  setInterval(draw, 1/20);
 }
 
 const LoadTexture = () => {
