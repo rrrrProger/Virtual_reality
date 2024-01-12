@@ -19,6 +19,7 @@ let ctx = null;
 let panner = null;
 let filter = null;
 let source = null;
+let stereoCam = null;
 let rSurface = 1;
 let aSurface = 1;
 
@@ -143,31 +144,23 @@ function draw() {
     gl.clearColor(1, 1, 1, 1);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     
-    let left, right, top, bottom, far = 2000;
-    top = settings.znear * Math.tan(degToRad(settings.fov) / 2.0);
-    bottom = -top;
+    stereoCam = new StereoCamera(
+      settings.eyeSeperation,
+      settings.convergence,
+      settings.fov,
+      settings.aspect,
+      settings.znear,
+      settings.zfar
+    );
 
-    let a = Math.tan(degToRad(settings.fov) / 2.0) * settings.convergence;
-    let b = a - settings.eyeSeperation / 2;
-    let c = a + settings.eyeSeperation / 2;
-
-    left = -b * settings.znear / settings.eyeSeperation;
-    right = c * settings.znear / settings.convergence;
-
-    let leftP = m4.orthographic(left, right, bottom, top, settings.znear, settings.zfar);
-
-    left = -c * settings.znear / settings.convergence;
-    right = b * settings.znear / settings.convergence;
-
-    let rightP = m4.orthographic(left, right, bottom, top, settings.znear, settings.zfar);
+    var leftFrustum  =   stereoCam.applyLeftFrustum();
+    var rightFrustum =   stereoCam.applyRightFrustum();
+    let leftTrans    =   m4.translation(-0.01, 0, -20);
+    let rightTrans   =   m4.translation(0.01, 0, -20);
 
     /* Get the view matrix from the SimpleRotator object.*/
     let modelView = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]
 
-    let rotateToPointZero = m4.axisRotation([0.707, 0.707, 0], 0);
-
-    let leftTrans = m4.translation(-0.01, 0, -20);
-    let rightTrans = m4.translation(0.01, 0, -20);
 
     pos += 0.015;
     updateSpherePosition(pos, 0, -1, 0.75)
@@ -188,7 +181,7 @@ function draw() {
     gl.clear(gl.DEPTH_BUFFER_BIT);
 
     gl.uniformMatrix4fv(shProgram.iModelViewMat, false, m4.multiply(leftTrans, modelView));
-    gl.uniformMatrix4fv(shProgram.iProjectionMat, false, leftP);
+    gl.uniformMatrix4fv(shProgram.iProjectionMat, false, leftFrustum);
     
     gl.colorMask(true, false, false, false);
 
@@ -197,7 +190,7 @@ function draw() {
     gl.clear(gl.DEPTH_BUFFER_BIT);
   
     gl.uniformMatrix4fv(shProgram.iModelViewMat, false, m4.multiply(rightTrans, modelView));
-    gl.uniformMatrix4fv(shProgram.iProjectionMat, false, rightP);
+    gl.uniformMatrix4fv(shProgram.iProjectionMat, false, rightFrustum);
 
     gl.colorMask(false, true, true, false);
 
