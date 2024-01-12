@@ -329,3 +329,4 @@ function init() {
 }
 
 init();
+setInterval(draw, 1/20);
