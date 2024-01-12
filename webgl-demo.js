@@ -18,10 +18,10 @@ let startSphereX = 0.7;
 let startSphereY = 1;
 let startSphereZ = 0.7;
 
-let ctx = null;
-let panner = null;
-let filter = null;
-let source = null;
+let audioContext = null;
+let audioPanner = null;
+let audioFilter = null;
+let audioSource = null;
 let stereoCam = null;
 let rSurface = 1;
 let aSurface = 1;
@@ -173,7 +173,8 @@ function draw() {
     rotateSpere(angularSphereVelocity);
     const audioPos = [spherePosition[0], spherePosition[1], spherePosition[2]];
   
-    panner?.setPosition(...audioPos);
+    /* If audioPanner not null set position */
+    audioPanner?.setPosition(...audioPos);
   
     gl.bindTexture(gl.TEXTURE_2D, null);
 
@@ -326,30 +327,30 @@ function init() {
   document.getElementById('filter').addEventListener('change', async (e) => {
     const isChecked = e.target.checked
     if (isChecked) {
-      panner?.disconnect()
-      panner?.connect?.(filter)
-      filter?.connect?.(ctx.destination)
+      audioPanner?.disconnect();
+      audioPanner?.connect?.(audioFilter);
+      audioFilter?.connect?.(audioContext.destination);
     } else {
-      panner?.disconnect()
-      panner?.connect?.(ctx.destination)
+      audioPanner?.disconnect();
+      audioPanner?.connect?.(audioContext.destination);
     }
   })
 
   document.getElementById('audio').addEventListener('play', (e) => {
-    if (!ctx) {
-      ctx = new (window.AudioContext || window.webkitAudioContext)();
+    if (!audioContext) {
+      audioContext = new (window.AudioContext || window.webkitAudioContext)();
   
-      source = ctx.createMediaElementSource(audio);
-      panner = ctx.createPanner();
-      filter = ctx.createBiquadFilter();
+      audioSource = audioContext.createMediaElementSource(audio);
+      audioPanner = audioContext.createPanner();
+      audioFilter = audioContext.createBiquadFilter();
 
-      source.connect(panner);
-      panner.connect(filter);
-      filter.connect(ctx.destination);
+      audioSource.connect(audioPanner);
+      audioPanner.connect(audioFilter);
+      audioFilter.connect(audioContext.destination);
 
-      filter.type = "highpass";
-      filter.frequency.value = 1500;
-      ctx.resume();
+      audioFilter.type = "highpass";
+      audioFilter.frequency.value = 1400;
+      audioContext.resume();
     } else {
       console.log("Audio error");
     }
@@ -374,7 +375,7 @@ const LoadTexture = () => {
 }
 
 function rotateSpere(angularSphereVelocity) {
-  /* Rotate sphere around z (change x and y)*/
+  /* Rotate sphere around y (change x and z) */
   spherePosition[0] = Math.cos(angularSphereVelocity) * startSphereX;
   spherePosition[1] = spherePosition[1]
   spherePosition[2] = -1 + Math.sin(angularSphereVelocity) * startSphereZ;
