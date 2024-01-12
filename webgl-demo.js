@@ -30,15 +30,17 @@ const settings = {
   aspect: 1.0,
   eyeSeperation: 94.0,
   convergence: 200.0,
+  speedRotation: 0.01,
 };
 
 webglLessonsUI.setupUI(document.querySelector('#ui'), settings, [
-  { type: 'slider',   key: 'fov',        min:   0, max: 360, change: draw, precision: 2, step: 0.001, },
-  { type: 'slider',   key: 'aspect',     min:   0.1, max: 10.0, change: draw, precision: 2, step: 0.001, },
-  { type: 'slider',   key: 'znear',      min:   1.0, max: 1000.0, change: draw, precision: 2, step: 0.001, },
-  { type: 'slider',   key: 'zfar',       min:   1.0, max: 2000.0, change: draw, precision: 2, step: 0.001, },
+  { type: 'slider',   key: 'fov',              min:   0, max: 360, change: draw, precision: 2, step: 0.001, },
+  { type: 'slider',   key: 'aspect',           min:   0.1, max: 10.0, change: draw, precision: 2, step: 0.001, },
+  { type: 'slider',   key: 'znear',            min:   1.0, max: 1000.0, change: draw, precision: 2, step: 0.001, },
+  { type: 'slider',   key: 'zfar',             min:   1.0, max: 2000.0, change: draw, precision: 2, step: 0.001, },
   { type: 'slider',   key: 'eyeSeperation',    min:   0.01, max: 499.0, change: draw, precision: 2, step: 0.001, },
-  { type: 'slider',   key: 'convergence',       min:   0.0, max: 10000.0, change: draw, precision: 2, step: 0.001, },
+  { type: 'slider',   key: 'convergence',      min:   0.0, max: 10000.0, change: draw, precision: 2, step: 0.001, },
+  { type: 'slider',   key: 'speedRotation',    min:   0.0, max: 1.0, change: draw, precision: 2, step: 0.001, },
 ]);
 
 function degToRad(d) {
@@ -157,21 +159,23 @@ function draw() {
     var rightFrustum =   stereoCam.applyRightFrustum();
     let leftTrans    =   m4.translation(-0.01, 0.2, -20);
     let rightTrans   =   m4.translation( 0.01, 0.2, -20);
-
+  
     /* Set up identity modelView matrix */
-    let modelViewStart = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]
+    const modelViewStart = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]
+  
+    /* Set starting projection Matrix */
+    const projectionStart = m4.perspective(degToRad(90), 1, 0.99, 1);
 
-    pos += 0.015;
-    updateSpherePosition(pos, 0, -1, 0.75)
+    pos += settings.speedRotation;
+    rotateSpere(pos, 0, -1, 0.75)
     const audioPos = [spherePosition[0], spherePosition[1], spherePosition[2]];
     panner?.setPosition(...audioPos);
     gl.bindTexture(gl.TEXTURE_2D, null);
 
-    const projection = m4.perspective(degToRad(90), 1, 0.99, 1);
     const translationSphere = m4.translation(...spherePosition);
     const modelViewMatrix = m4.multiply(translationSphere, modelViewStart);
 
-    gl.uniformMatrix4fv(shProgram.iModelViewMat, false, projection);
+    gl.uniformMatrix4fv(shProgram.iModelViewMat, false, projectionStart);
     gl.uniformMatrix4fv(shProgram.iProjectionMat, false, modelViewMatrix);
     
     sphere.DrawSphere();
@@ -364,9 +368,11 @@ const LoadTexture = () => {
   });
 }
 
-function updateSpherePosition(newPos) {
-  spherePosition[0] = Math.cos(newPos) * 0.75;
-  spherePosition[2] = -1 + Math.sin(newPos) * 0.75;
+function rotateSpere(angle) {
+  /* Rotate sphere around z (change x and y)*/
+  spherePosition[0] = Math.cos(angle) * Math.PI / 4;
+  spherePosition[1] = spherePosition[1]
+  spherePosition[2] = -1 + Math.sin(angle) * Math.PI / 4;
 }
 
 init()
