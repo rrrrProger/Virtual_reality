@@ -12,8 +12,11 @@ let video;
 let BG;
 
 let sphere = null;
-let pos = 0;
+let angularSphereVelocity = 0;
 let spherePosition = [0, 0, 0];
+let startSphereX = 0.7;
+let startSphereY = 1;
+let startSphereZ = 0.7;
 
 let ctx = null;
 let panner = null;
@@ -166,10 +169,12 @@ function draw() {
     /* Set starting projection Matrix */
     const projectionStart = m4.perspective(degToRad(90), 1, 0.99, 1);
 
-    pos += settings.speedRotation;
-    rotateSpere(pos, 0, -1, 0.75)
+    angularSphereVelocity += settings.speedRotation;
+    rotateSpere(angularSphereVelocity);
     const audioPos = [spherePosition[0], spherePosition[1], spherePosition[2]];
+  
     panner?.setPosition(...audioPos);
+  
     gl.bindTexture(gl.TEXTURE_2D, null);
 
     const translationSphere = m4.translation(...spherePosition);
@@ -288,7 +293,7 @@ function createProgram(gl, vShader, fShader) {
        throw new Error("Error in fragment shader:  " + gl.getShaderInfoLog(fsh));
     }
     let prog = gl.createProgram();
-    gl.attachShader(prog,vsh);
+    gl.attachShader(prog, vsh);
     gl.attachShader(prog, fsh);
     gl.linkProgram(prog);
     if ( ! gl.getProgramParameter( prog, gl.LINK_STATUS) ) {
@@ -368,11 +373,11 @@ const LoadTexture = () => {
   });
 }
 
-function rotateSpere(angle) {
+function rotateSpere(angularSphereVelocity) {
   /* Rotate sphere around z (change x and y)*/
-  spherePosition[0] = Math.cos(angle) * Math.PI / 4;
+  spherePosition[0] = Math.cos(angularSphereVelocity) * startSphereX;
   spherePosition[1] = spherePosition[1]
-  spherePosition[2] = -1 + Math.sin(angle) * Math.PI / 4;
+  spherePosition[2] = -1 + Math.sin(angularSphereVelocity) * startSphereZ;
 }
 
 init()
