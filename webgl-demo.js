@@ -11,6 +11,180 @@ let stereoCam = null;
 let rSurface = 1;
 let aSurface = 1;
 
+var accelerometerVector = new Float32Array(4);
+var magnetometerVector = new Float32Array(4);
+var matrixFromGyroscope = new Float32Array(16);
+var rotationMatrixFromMagnetometerAndAccelerometer = new Float32Array(16);
+
+socket.onmessage = function (e) {
+  var data = JSON.parse(e.data);
+  var type = data.type;
+  var values = data.values;
+  var timestamp = data.timestamp;
+
+  switch (type) {
+    case 'android.sensor.accelerometer':
+      accelerometerVector = values
+      break;
+    case 'android.sensor.magnetic_field':
+      magnetometerVector = values;
+      break;
+    case 'android.sensor.gyroscope':
+      matrixFromGyroscope = getMatrixDataFromGyroscope(values, timestamp);
+      break;
+  }
+
+  if (!accelerometerVector.every(item => item === 0) && !magnetometerVector.every(item => item === 0)) {
+    rotationMatrixFromMagnetometerAndAccelerometer = getRotationMatrixFromMagnetometerAndAccelerometer(accelerometerVector, magnetometerVector);
+  }
+  if (!matrixFromGyroscope.every(item => item === 0)) {
+    MatrixRotationModelView = constructModelViewMatrix(rotationMatrixFromMagnetometerAndAccelerometer, matrixFromGyroscope);
+  }
+  draw();
+};
+
+function constructModelViewMatrix(rotationMatrixFromMagnetometerAndAccelerometer, matrixFromGyroscope) {
+  var weightGyroscope = 0.5;
+  var weightMagnetometerAndAccelerometer = 0.5;
+  var resultModelView = new Float32Array(16);
+
+  resultModelView.forEach((element, index) => resultModelView[index] = weightGyroscope * matrixFromGyroscope[index] + weightMagnetometerAndAccelerometer * rotationMatrixFromMagnetometerAndAccelerometer[index]);
+
+  return resultModelView;
+}
+
+function getMatrixDataFromGyroscope(values, timestamp) {
+    var deltaRotationMatrix = new Float32Array(16);
+    var deltaRotationVector = new Float32Array(4);
+    var NS2S = 1.0 / 1000000000.0;
+    var axisX = values[0];
+    var axisY = values[1];
+    var axisZ = values[2];
+    var dT = (timestamp - last_timestamp) * NS2S;
+    var omegaMagnitude = Math.sqrt(axisX * axisX + axisY * axisY + axisZ * axisZ);
+  
+    axisX = axisX / omegaMagnitude;
+    axisY = axisY / omegaMagnitude;
+    axisZ = axisZ / omegaMagnitude;
+
+    var thetaOverTwo = omegaMagnitude * dT / 2.0
+    var sinThetaOverTwo = Math.sin(thetaOverTwo)
+    var cosThetaOverTwo = Math.cos(thetaOverTwo)
+
+    deltaRotationVector[0] = sinThetaOverTwo * axisX
+    deltaRotationVector[1] = sinThetaOverTwo * axisY
+    deltaRotationVector[2] = sinThetaOverTwo * axisZ
+    deltaRotationVector[3] = cosThetaOverTwo
+    last_timestamp = timestamp;
+
+    function getRotationMatrixFromVector(deltaRotationMatrix, deltaRotationVector) {
+      var q0;
+      var q1 = deltaRotationVector[0];
+      var q2 = deltaRotationVector[1];
+      var q3 = deltaRotationVector[2];
+      if (deltaRotationVector.length >= 4) {
+          q0 = deltaRotationVector[3];
+      } else {
+          q0 = 1 - q1 * q1 - q2 * q2 - q3 * q3;
+          if (q0 > 0) {
+            q0 = Math.sqrt(q0);
+          } else {
+            q0 = 0;
+          }
+      }
+
+      var sq_q1 = 2 * q1 * q1;
+      var sq_q2 = 2 * q2 * q2;
+      var sq_q3 = 2 * q3 * q3;
+      var q1_q2 = 2 * q1 * q2;
+      var q3_q0 = 2 * q3 * q0;
+      var q1_q3 = 2 * q1 * q3;
+      var q2_q0 = 2 * q2 * q0;
+      var q2_q3 = 2 * q2 * q3;
+      var q1_q0 = 2 * q1 * q0;
+      if (deltaRotationMatrix.length == 9) {
+          deltaRotationMatrix[0] = 1 - sq_q2 - sq_q3;
+          deltaRotationMatrix[1] = q1_q2 - q3_q0;
+          deltaRotationMatrix[2] = q1_q3 + q2_q0;
+          deltaRotationMatrix[3] = q1_q2 + q3_q0;
+          deltaRotationMatrix[4] = 1 - sq_q1 - sq_q3;
+          deltaRotationMatrix[5] = q2_q3 - q1_q0;
+          deltaRotationMatrix[6] = q1_q3 - q2_q0;
+          deltaRotationMatrix[7] = q2_q3 + q1_q0;
+          deltaRotationMatrix[8] = 1 - sq_q1 - sq_q2;
+      } else if (deltaRotationMatrix.length == 16) {
+          deltaRotationMatrix[0] = 1 - sq_q2 - sq_q3;
+          deltaRotationMatrix[1] = q1_q2 - q3_q0;
+          deltaRotationMatrix[2] = q1_q3 + q2_q0;
+          deltaRotationMatrix[3] = 0.0;
+          deltaRotationMatrix[4] = q1_q2 + q3_q0;
+          deltaRotationMatrix[5] = 1 - sq_q1 - sq_q3;
+          deltaRotationMatrix[6] = q2_q3 - q1_q0;
+          deltaRotationMatrix[7] = 0.0;
+          deltaRotationMatrix[8] = q1_q3 - q2_q0;
+          deltaRotationMatrix[9] = q2_q3 + q1_q0;
+          deltaRotationMatrix[10] = 1 - sq_q1 - sq_q2;
+          deltaRotationMatrix[11] = 0.0;
+          deltaRotationMatrix[12] = 0;
+          deltaRotationMatrix[13] = 0.0;
+          deltaRotationMatrix[14] = 0.0;
+          deltaRotationMatrix[15] = 1.0;
+      }
+    }
+    
+    getRotationMatrixFromVector(deltaRotationMatrix, deltaRotationVector);
+    
+    return deltaRotationMatrix;
+}
+
+function getRotationMatrixFromMagnetometerAndAccelerometer(gravity, geomagnetic) {
+// TODO: move this to native code for efficiency
+  var Ax = gravity[0];
+  var Ay = gravity[1];
+  var Az = gravity[2];
+  var normsqA = (Ax * Ax + Ay * Ay + Az * Az);
+  var g = 9.81;
+  var freeFallGravitySquared = 0.01 * g * g;
+  var R = new Float32Array(16);
+  if (normsqA < freeFallGravitySquared) {
+    // gravity less than 10% of normal value
+    return false;
+  }
+  var Ex = geomagnetic[0];
+  var Ey = geomagnetic[1];
+  var Ez = geomagnetic[2];
+  var Hx = Ey * Az - Ez * Ay;
+  var Hy = Ez * Ax - Ex * Az;
+  var Hz = Ex * Ay - Ey * Ax;
+  var normH = Math.sqrt(Hx * Hx + Hy * Hy + Hz * Hz);
+  if (normH < 0.1) {
+    // device is close to free fall (or in space?), or close to
+    // magnetic north pole. Typical values are  > 100.
+    return false;
+  }
+  var invH = 1.0 / normH;
+  Hx *= invH;
+  Hy *= invH;
+  Hz *= invH;
+  var invA = 1.0/ Math.sqrt(Ax * Ax + Ay * Ay + Az * Az);
+  Ax *= invA;
+  Ay *= invA;
+  Az *= invA;
+  var Mx = Ay * Hz - Az * Hy;
+  var My = Az * Hx - Ax * Hz;
+  var Mz = Ax * Hy - Ay * Hx;
+
+  R[0]  = Hx;    R[1]  = Hy;    R[2]  = Hz;   R[3]  = 0;
+  R[4]  = Mx;    R[5]  = My;    R[6]  = Mz;   R[7]  = 0;
+  R[8]  = Ax;    R[9]  = Ay;    R[10] = Az;   R[11] = 0;
+  R[12] = 0;     R[13] = 0;     R[14] = 0;    R[15] = 1;
+
+  gravity.fill(0);
+  geomagnetic.fill(0);
+
+  return R;
+}
+
 const settings = {
   fov: 110,
   znear: 1,
@@ -20,7 +194,6 @@ const settings = {
   convergence: 1517.0,
 };
 
-const socket = new WebSocket('ws://Pixel-4.netis:8080/sensor/connect?type=android.sensor.gyroscope');
 var last_timestamp = 0;
 
 socket.addEventListener("message", event => {
