@@ -11,6 +11,8 @@ let stereoCam = null;
 let rSurface = 1;
 let aSurface = 1;
 
+let spaceball = null;
+
 const settings = {
   fov: 110,
   znear: 1,
@@ -154,15 +156,15 @@ function draw() {
   
     gl.bindTexture(gl.TEXTURE_2D, null);
 
-    const modelViewMatrix = modelViewStart;
+    const modelViewMatrix = spaceball ? spaceball.getViewMatrix() : modelViewStart;
 
-    gl.uniformMatrix4fv(shProgram.iModelViewMat, false, projectionStart);
-    gl.uniformMatrix4fv(shProgram.iProjectionMat, false, modelViewMatrix);
+    gl.uniformMatrix4fv(shProgram.iModelViewMat, false, modelViewMatrix);
+    gl.uniformMatrix4fv(shProgram.iProjectionMat, false, projectionStart);
     
     gl.bindTexture(gl.TEXTURE_2D, texture);
     gl.clear(gl.DEPTH_BUFFER_BIT);
 
-    gl.uniformMatrix4fv(shProgram.iModelViewMat, false, m4.multiply(leftTranslate, modelViewStart));
+    gl.uniformMatrix4fv(shProgram.iModelViewMat, false, m4.multiply(leftTranslate, modelViewMatrix));
     gl.uniformMatrix4fv(shProgram.iProjectionMat, false, leftFrustum);
     
     gl.colorMask(true, false, false, false);
@@ -171,7 +173,7 @@ function draw() {
   
     gl.clear(gl.DEPTH_BUFFER_BIT);
   
-    gl.uniformMatrix4fv(shProgram.iModelViewMat, false, m4.multiply(rightTranslate, modelViewStart));
+    gl.uniformMatrix4fv(shProgram.iModelViewMat, false, m4.multiply(rightTranslate, modelViewMatrix));
     gl.uniformMatrix4fv(shProgram.iProjectionMat, false, rightFrustum);
 
     gl.colorMask(false, true, true, false);
@@ -257,6 +259,7 @@ function init() {
     }
     try {
         initGL();  // initialize the WebGL graphics context
+        spaceball = new SimpleRotator(canvas, draw, 10);
     }
     catch (e) {
         console.log('Error initGL()');
