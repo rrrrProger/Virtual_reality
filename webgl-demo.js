@@ -155,12 +155,11 @@ function draw() {
 
     var leftFrustum  =   stereoCam.applyLeftFrustum();
     var rightFrustum =   stereoCam.applyRightFrustum();
-    let leftTrans    =   m4.translation(-0.01, 0, -20);
-    let rightTrans   =   m4.translation(0.01, 0, -20);
+    let leftTrans    =   m4.translation(-0.01, 0.2, -20);
+    let rightTrans   =   m4.translation( 0.01, 0.2, -20);
 
-    /* Get the view matrix from the SimpleRotator object.*/
-    let modelView = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]
-
+    /* Set up identity modelView matrix */
+    let modelViewStart = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]
 
     pos += 0.015;
     updateSpherePosition(pos, 0, -1, 0.75)
@@ -170,7 +169,7 @@ function draw() {
 
     const projection = m4.perspective(degToRad(90), 1, 0.99, 1);
     const translationSphere = m4.translation(...spherePosition);
-    const modelViewMatrix = m4.multiply(translationSphere, modelView);
+    const modelViewMatrix = m4.multiply(translationSphere, modelViewStart);
 
     gl.uniformMatrix4fv(shProgram.iModelViewMat, false, projection);
     gl.uniformMatrix4fv(shProgram.iProjectionMat, false, modelViewMatrix);
@@ -180,7 +179,7 @@ function draw() {
     gl.bindTexture(gl.TEXTURE_2D, texture);
     gl.clear(gl.DEPTH_BUFFER_BIT);
 
-    gl.uniformMatrix4fv(shProgram.iModelViewMat, false, m4.multiply(leftTrans, modelView));
+    gl.uniformMatrix4fv(shProgram.iModelViewMat, false, m4.multiply(leftTrans, modelViewStart));
     gl.uniformMatrix4fv(shProgram.iProjectionMat, false, leftFrustum);
     
     gl.colorMask(true, false, false, false);
@@ -189,7 +188,7 @@ function draw() {
   
     gl.clear(gl.DEPTH_BUFFER_BIT);
   
-    gl.uniformMatrix4fv(shProgram.iModelViewMat, false, m4.multiply(rightTrans, modelView));
+    gl.uniformMatrix4fv(shProgram.iModelViewMat, false, m4.multiply(rightTrans, modelViewStart));
     gl.uniformMatrix4fv(shProgram.iProjectionMat, false, rightFrustum);
 
     gl.colorMask(false, true, true, false);
@@ -214,15 +213,15 @@ const CreateSurfaceData = () => {
 /*
  * Create spere data for audio 
 */
-const CreateSphereData = (segmentsI, segmentsJ) => {
+const CreateSphereData = (I, J) => {
   let vertexList = [];
   let textureList = [];
 
-  for (let i = 0; i <= segmentsI; i++) {
-    const theta = i * Math.PI / segmentsI;
+  for (let i = 0; i <= I; i++) {
+    const theta = i * Math.PI / I;
 
-    for (let j = 0; j <= segmentsJ; j++) {
-      const phi = j * 2 * Math.PI / segmentsJ;
+    for (let j = 0; j <= J; j++) {
+      const phi = j * 2 * Math.PI / J;
 
       vertexList.push(
         Math.cos(phi) * Math.sin(theta),
@@ -230,7 +229,7 @@ const CreateSphereData = (segmentsI, segmentsJ) => {
         Math.sin(phi) * Math.sin(theta)
       );
 
-      textureList.push(1 - (j / segmentsJ), 1 - (i / segmentsI));
+      textureList.push(1 - (j / J), 1 - (i / I));
     }
   }
 
@@ -299,9 +298,6 @@ const rerender = () => {
   window.requestAnimationFrame(rerender);
 }
 
-/**
- * initialization function that will be called when the page has loaded
- */
 function init() {
     let canvas;
     try {
