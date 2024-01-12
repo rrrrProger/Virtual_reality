@@ -4,14 +4,7 @@ WebGL is used as main library.
 
 Added surface drawing and rotating by mouse using spaceball matrix.
 
-Work examples:
-First initial position:
-![Alt text](images/image-7.png)
-In the right top corner there are parameters that can be changed (FOV, aspect ratio, znear, zfar, eye_seperation - distance between the eyes, convergence)
-For example let's try to change FOV, ratio and znear and apply left and right frustum
-Let's try to change some params:
-With changed FOV:
-![Alt text](images/image-8.png)
 
-Gif presenting me with anaglyphic glasses and rotationg model by mouse.
-![Alt text](images/lab1_capture.gif)
+
+https://github.com/RomaTsymbaliuk/Virtual_reality/assets/81329681/32d7929b-4f6a-4e6f-a8eb-27496d4e70b7
+
